@@ -111,11 +111,31 @@ export function useAuth() {
     }
   }
 
+  // Helper para hacer requests autenticados con CSRF
+  async function authenticatedFetch(url, options = {}) {
+    await setCsrfCookie()
+    const csrfToken = getCookie('csrftoken')
+    
+    const defaultOptions = {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+        ...options.headers,
+      },
+    }
+    
+    return fetch(url, { ...defaultOptions, ...options })
+  }
+
   return {
     currentUser,
     loadCurrentUser,
     register,
     login,
     logout,
+    getCookie,
+    setCsrfCookie,
+    authenticatedFetch,
   }
 }

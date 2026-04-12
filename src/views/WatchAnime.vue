@@ -1,14 +1,15 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import Hls from 'hls.js'
 
 const router = useRouter()
 const route = useRoute()
-const { currentUser, logout, loadCurrentUser } = useAuth()
+const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
 
 const animeId = ref(route.query.anime)
-const episodeId = ref(route.query.episode)
+const episodeNumber = ref(parseInt(route.query.episode) || 1)
 
 const anime = ref(null)
 const episodes = ref([])
@@ -16,6 +17,14 @@ const currentEpisode = ref(null)
 const isLoading = ref(true)
 const showAllEpisodes = ref(false)
 const showFullDescription = ref(false)
+
+// HLS.js player
+const videoPlayer = ref(null)
+const hls = ref(null)
+const isLoadingVideo = ref(false)
+const videoError = ref(null)
+const videoProgress = ref(0)
+const videoDuration = ref(0)
 
 // Estado de interacciones
 const liked = ref(false)
@@ -39,7 +48,22 @@ onMounted(async () => {
     router.push('/login')
   }
   await loadAnime()
-  await loadEpisodes()
+  await loadEpisodeData()
+  await loadEpisodeSources()
+})
+
+onBeforeUnmount(() => {
+  // Limpiar HLS.js
+  if (hls.value) {
+    hls.value.destroy()
+    hls.value = null
+  }
+})
+
+// Watch para detectar cambios de episodio
+watch([animeId, episodeNumber], async () => {
+  await loadEpisodeData()
+  await loadEpisodeSources()
 })
 
 async function loadAnime() {
@@ -57,7 +81,7 @@ async function loadAnime() {
   }
 }
 
-async function loadEpisodes() {
+async function loadEpisodeData() {
   if (!animeId.value) return
   
   isLoading.value = true
@@ -69,10 +93,10 @@ async function loadEpisodes() {
       const data = await response.json()
       episodes.value = data.results || data
       
-      // Si hay episodio en URL, seleccionarlo, sino el primero
-      if (episodeId.value) {
-        const ep = episodes.value.find(e => e.id === parseInt(episodeId.value))
-        if (ep) currentEpisode.value = ep
+      // Buscar el episodio actual por número
+      const ep = episodes.value.find(e => e.episode_number === episodeNumber.value)
+      if (ep) {
+        currentEpisode.value = ep
       } else if (episodes.value.length > 0) {
         currentEpisode.value = episodes.value[0]
       }
@@ -84,20 +108,174 @@ async function loadEpisodes() {
   }
 }
 
+async function loadEpisodeSources() {
+  if (!anime.value || !anime.value.anime_slug) {
+    console.error('No anime slug available')
+    videoError.value = 'anime_slug no configurado en la base de datos'
+    return
+  }
+
+  isLoadingVideo.value = true
+  videoError.value = null
+  
+  try {
+    const animeSlug = anime.value.anime_slug
+    const response = await authenticatedFetch(
+      `/api/backoffice/consumet/sources/${animeSlug}/${episodeNumber.value}/`
+    )
+    
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: No se pudo cargar el video`)
+    }
+    
+    const data = await response.json()
+    
+    if (!data.sources || data.sources.length === 0) {
+      throw new Error('No hay fuentes de video disponibles')
+    }
+    
+    // Buscar fuente M3U8 de mejor calidad
+    const m3u8Source = data.sources.find(s => s.isM3U8 && s.quality === 'default') || data.sources[0]
+    
+    if (!m3u8Source || !m3u8Source.url) {
+      throw new Error('No se encontró URL de video válida')
+    }
+    
+    // Configurar HLS.js
+    await setupHlsPlayer(m3u8Source.url, data.headers)
+    
+  } catch (error) {
+    console.error('Error loading episode sources:', error)
+    videoError.value = error.message || 'Error desconocido al cargar el video'
+  } finally {
+    isLoadingVideo.value = false
+  }
+}
+
+async function setupHlsPlayer(videoUrl, headers = {}) {
+  // Limpiar player anterior si existe
+  if (hls.value) {
+    hls.value.destroy()
+    hls.value = null
+  }
+  
+  if (!videoPlayer.value) {
+    console.error('Video player element not found')
+    return
+  }
+  
+  if (Hls.isSupported()) {
+    // Usar HLS.js para navegadores que no soportan HLS nativamente
+    hls.value = new Hls({
+      xhrSetup: (xhr) => {
+        // Agregar headers necesarios (Referer, etc)
+        if (headers.Referer) {
+          xhr.setRequestHeader('Referer', headers.Referer)
+        }
+      }
+    })
+    
+    hls.value.loadSource(videoUrl)
+    hls.value.attachMedia(videoPlayer.value)
+    
+    hls.value.on(Hls.Events.MANIFEST_PARSED, () => {
+      console.log('Video loaded successfully')
+      videoPlayer.value.play().catch(e => {
+        console.log('Autoplay prevented:', e)
+      })
+    })
+    
+    hls.value.on(Hls.Events.ERROR, (event, data) => {
+      console.error('HLS Error:', data)
+      if (data.fatal) {
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            videoError.value = 'Error de red al cargar el video'
+            hls.value.startLoad()
+            break
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            videoError.value = 'Error de reproducción'
+            hls.value.recoverMediaError()
+            break
+          default:
+            videoError.value = 'Error fatal al reproducir el video'
+            hls.value.destroy()
+            break
+        }
+      }
+    })
+    
+  } else if (videoPlayer.value.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari soporta HLS nativamente
+    videoPlayer.value.src = videoUrl
+    videoPlayer.value.addEventListener('loadedmetadata', () => {
+      videoPlayer.value.play().catch(e => {
+        console.log('Autoplay prevented:', e)
+      })
+    })
+  } else {
+    videoError.value = 'Tu navegador no soporta reproducción de video HLS'
+  }
+}
+
+// Event listeners para el video player
+function onVideoTimeUpdate() {
+  if (videoPlayer.value) {
+    videoProgress.value = videoPlayer.value.currentTime
+    videoDuration.value = videoPlayer.value.duration
+    
+    // Actualizar progreso cada 10 segundos
+    if (Math.floor(videoProgress.value) % 10 === 0) {
+      updateWatchProgress(false)
+    }
+  }
+}
+
+function onVideoEnded() {
+  // Marcar episodio como completado
+  updateWatchProgress(true)
+  
+  // Auto-avanzar al siguiente episodio si existe
+  if (nextEpisode.value) {
+    setTimeout(() => {
+      goToNextEpisode()
+    }, 2000)
+  }
+}
+
+async function updateWatchProgress(episodeCompleted = false) {
+  if (!animeId.value) return
+  
+  try {
+    const currentEp = episodeCompleted ? episodeNumber.value : episodeNumber.value - 1
+    
+    await authenticatedFetch(`/api/backoffice/progress/${animeId.value}/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        current_episode: currentEp,
+        watched: false
+      })
+    })
+  } catch (error) {
+    console.error('Error updating watch progress:', error)
+  }
+}
+
 function selectEpisode(episode) {
   currentEpisode.value = episode
+  episodeNumber.value = episode.episode_number
   router.replace({ 
     query: { 
       anime: animeId.value, 
-      episode: episode.id 
+      episode: episode.episode_number
     } 
   })
 }
 
 const nextEpisode = computed(() => {
   if (!currentEpisode.value || episodes.value.length === 0) return null
-  const currentIndex = episodes.value.findIndex(ep => ep.id === currentEpisode.value.id)
-  if (currentIndex < episodes.value.length - 1) {
+  const currentIndex = episodes.value.findIndex(ep => ep.episode_number === episodeNumber.value)
+  if (currentIndex >= 0 && currentIndex < episodes.value.length - 1) {
     return episodes.value[currentIndex + 1]
   }
   return null
@@ -106,6 +284,7 @@ const nextEpisode = computed(() => {
 function goToNextEpisode() {
   if (nextEpisode.value) {
     selectEpisode(nextEpisode.value)
+    showAllEpisodes.value = false
   }
 }
 
@@ -157,14 +336,36 @@ function goHome() {
   <div class="watch-page">
     <!-- Video Player -->
     <div class="player-container">
-      <div class="player-wrapper" v-if="currentEpisode">
-        <iframe 
-          :src="currentEpisode.video_url" 
-          frameborder="0" 
-          allowfullscreen
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        ></iframe>
+      <div class="player-wrapper" v-if="currentEpisode && !videoError">
+        <!-- Loading Spinner -->
+        <div v-if="isLoadingVideo" class="video-loading">
+          <div class="spinner"></div>
+          <p>Cargando video...</p>
+        </div>
+        
+        <!-- Video Element -->
+        <video 
+          ref="videoPlayer"
+          class="video-player"
+          controls
+          @timeupdate="onVideoTimeUpdate"
+          @ended="onVideoEnded"
+          v-show="!isLoadingVideo"
+        ></video>
       </div>
+      
+      <!-- Error Message -->
+      <div v-else-if="videoError" class="player-error">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p>{{ videoError }}</p>
+        <button class="btn-retry" @click="loadEpisodeSources">Reintentar</button>
+      </div>
+      
+      <!-- Placeholder -->
       <div v-else class="player-placeholder">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -392,14 +593,82 @@ function goHome() {
   padding-bottom: 56.25%; /* 16:9 */
   height: 0;
   overflow: hidden;
+  background: #000;
 }
 
-.player-wrapper iframe {
+.video-player {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+  background: #000;
+}
+
+.video-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: #9333ea;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(147, 51, 234, 0.2);
+  border-top-color: #9333ea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.player-error {
+  padding-bottom: 56.25%;
+  background: #0a0a0a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+  gap: 1rem;
+}
+
+.player-error svg {
+  opacity: 0.6;
+}
+
+.player-error p {
+  max-width: 400px;
+  text-align: center;
+  margin: 0;
+}
+
+.btn-retry {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #9333ea;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-retry:hover {
+  background: #7e22ce;
+  transform: translateY(-2px);
 }
 
 .player-placeholder {

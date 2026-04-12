@@ -6,7 +6,7 @@ import AnimeCard from '../components/AnimeCard.vue'
 import ContinueWatchingCard from '../components/ContinueWatchingCard.vue'
 
 const router = useRouter()
-const { currentUser, logout, loadCurrentUser } = useAuth()
+const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
 
 // Hero carousel data
 const featuredAnimes = ref([])
@@ -21,6 +21,9 @@ const simulcasts = ref([])
 const actionAnimes = ref([])
 const romanceAnimes = ref([])
 const comedyAnimes = ref([])
+
+// Progreso del usuario
+const userProgress = ref([])
 
 function nextSlide() {
   currentSlide.value = (currentSlide.value + 1) % featuredAnimes.value.length
@@ -68,6 +71,30 @@ function scrollCarousel(containerClass, direction) {
   }
 }
 
+// Cargar progreso del usuario desde el backend
+async function loadUserProgress() {
+  try {
+    const response = await authenticatedFetch('/api/backoffice/progress/')
+    if (response.ok) {
+      const data = await response.json()
+      userProgress.value = data.progress || []
+      console.log('User progress loaded:', userProgress.value.length, 'items')
+    }
+  } catch (error) {
+    console.error('Error loading user progress:', error)
+  }
+}
+
+// Obtener el progreso de un anime específico
+function getAnimeProgress(animeId) {
+  const progress = userProgress.value.find(p => p.anime_id === animeId)
+  return progress || {
+    current_episode: 0,
+    total_episodes: 0,
+    watched: false
+  }
+}
+
 async function loadAnimes() {
   try {
     const response = await fetch('/api/backoffice/public/animes/', {
@@ -77,17 +104,9 @@ async function loadAnimes() {
       const data = await response.json()
       const animes = data.results || data
       
-      // Hero carousel - Top 5 animes con estado de visualización simulado
-      featuredAnimes.value = animes.slice(0, 5).map((anime, index) => {
-        // Simular diferentes estados de visualización
-        const states = [
-          { watched: true, currentEpisode: 0, totalEpisodes: anime.episode_count || 24 }, // Completado
-          { watched: false, currentEpisode: 0, totalEpisodes: anime.episode_count || 24 }, // Sin empezar
-          { watched: false, currentEpisode: 8, totalEpisodes: anime.episode_count || 24 }, // A mitad
-          { watched: false, currentEpisode: 15, totalEpisodes: anime.episode_count || 24 }, // Avanzado
-          { watched: true, currentEpisode: 0, totalEpisodes: anime.episode_count || 24 } // Completado
-        ]
-        const state = states[index % 5]
+      // Hero carousel - Top 5 animes con estado de visualización REAL del backend
+      featuredAnimes.value = animes.slice(0, 5).map((anime) => {
+        const progress = getAnimeProgress(anime.id)
         
         return {
           id: anime.id,
@@ -97,9 +116,9 @@ async function loadAnimes() {
           description: anime.description,
           background: anime.background_image || anime.cover_image,
           rating: anime.rating,
-          watched: state.watched,
-          currentEpisode: state.currentEpisode,
-          totalEpisodes: state.totalEpisodes
+          watched: progress.watched,
+          currentEpisode: progress.current_episode,
+          totalEpisodes: anime.episode_count || progress.total_episodes || 24
         }
       })
       
@@ -147,17 +166,27 @@ async function loadAnimes() {
                          anime.genre?.toLowerCase().includes('comedia'))
         .map(transformAnime)
       
-      // Continue Watching - formato horizontal con datos de episodio
-      continueWatching.value = animes.slice(0, 6).map((anime, index) => ({
-        animeId: anime.id,
-        title: anime.title,
-        episodeNumber: Math.floor(Math.random() * 12) + 1,
-        episodeTitle: null,
-        thumbnail: anime.background_image || anime.cover_image,
-        progress: 25 + (index * 10), // Progreso simulado
-        duration: '24m',
-        audioType: anime.audio_type || 'SUB'
-      }))
+      // Continue Watching - REAL data from user progress (episodios en progreso)
+      continueWatching.value = userProgress.value
+        .filter(p => p.current_episode > 0 && !p.watched) // Solo en progreso
+        .slice(0, 6) // Máximo 6
+        .map(progress => {
+          // Buscar el anime correspondiente
+          const anime = animes.find(a => a.id === progress.anime_id)
+          if (!anime) return null
+          
+          return {
+            animeId: anime.id,
+            title: anime.title,
+            episodeNumber: progress.current_episode + 1, // Próximo episodio
+            episodeTitle: null,
+            thumbnail: anime.background_image || anime.cover_image,
+            progress: Math.round((progress.current_episode / progress.total_episodes) * 100),
+            duration: '24m',
+            audioType: anime.audio_type || 'SUB'
+          }
+        })
+        .filter(item => item !== null) // Remover nulls
     }
   } catch (error) {
     console.error('Error loading animes:', error)
@@ -192,7 +221,11 @@ onMounted(async () => {
   if (!user) {
     router.push('/login')
   }
+  
+  // Cargar progreso PRIMERO, luego animes
+  await loadUserProgress()
   await loadAnimes()
+  
   if (featuredAnimes.value.length > 0) {
     startAutoplay()
   }
