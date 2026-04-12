@@ -1,16 +1,26 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import AnimeCard from '../components/AnimeCard.vue'
+import ContinueWatchingCard from '../components/ContinueWatchingCard.vue'
 
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser } = useAuth()
 
-// Hero carousel data - cargado desde el backend
+// Hero carousel data
 const featuredAnimes = ref([])
 const currentSlide = ref(0)
 let autoplayInterval = null
+
+// Categorías de contenido
+const continueWatching = ref([])
+const newThisSeason = ref([])
+const popularNow = ref([])
+const simulcasts = ref([])
+const actionAnimes = ref([])
+const romanceAnimes = ref([])
+const comedyAnimes = ref([])
 
 function nextSlide() {
   currentSlide.value = (currentSlide.value + 1) % featuredAnimes.value.length
@@ -35,10 +45,28 @@ function stopAutoplay() {
   }
 }
 
-// Datos de animes desde la API
-const continueWatching = ref([])
-const popularNow = ref([])
-const newReleases = ref([])
+// Determinar el texto del botón según el progreso
+function getWatchButtonText(anime) {
+  if (anime.watched) {
+    return 'VER DE NUEVO'
+  }
+  if (anime.currentEpisode > 0) {
+    return `CONTINUAR EP. ${anime.currentEpisode + 1}`
+  }
+  return 'COMENZAR A VER'
+}
+
+// Scroll horizontal para carruseles
+function scrollCarousel(containerClass, direction) {
+  const container = document.querySelector(containerClass)
+  if (container) {
+    const scrollAmount = 300
+    container.scrollBy({
+      left: direction === 'next' ? scrollAmount : -scrollAmount,
+      behavior: 'smooth'
+    })
+  }
+}
 
 async function loadAnimes() {
   try {
@@ -49,26 +77,87 @@ async function loadAnimes() {
       const data = await response.json()
       const animes = data.results || data
       
-      // Cargar animes en el carrusel (máximo 5)
-      featuredAnimes.value = animes.slice(0, 5).map(anime => ({
-        id: anime.id,
-        title: anime.title,
-        year: anime.year,
-        genre: anime.genre,
-        description: anime.description,
-        background: anime.background_image
-      }))
+      // Hero carousel - Top 5 animes con estado de visualización simulado
+      featuredAnimes.value = animes.slice(0, 5).map((anime, index) => {
+        // Simular diferentes estados de visualización
+        const states = [
+          { watched: true, currentEpisode: 0, totalEpisodes: anime.episode_count || 24 }, // Completado
+          { watched: false, currentEpisode: 0, totalEpisodes: anime.episode_count || 24 }, // Sin empezar
+          { watched: false, currentEpisode: 8, totalEpisodes: anime.episode_count || 24 }, // A mitad
+          { watched: false, currentEpisode: 15, totalEpisodes: anime.episode_count || 24 }, // Avanzado
+          { watched: true, currentEpisode: 0, totalEpisodes: anime.episode_count || 24 } // Completado
+        ]
+        const state = states[index % 5]
+        
+        return {
+          id: anime.id,
+          title: anime.title,
+          year: anime.year,
+          genre: anime.genre,
+          description: anime.description,
+          background: anime.background_image || anime.cover_image,
+          rating: anime.rating,
+          watched: state.watched,
+          currentEpisode: state.currentEpisode,
+          totalEpisodes: state.totalEpisodes
+        }
+      })
       
-      // Transformar datos para las secciones
-      popularNow.value = animes.map(anime => ({
-        id: anime.id,
+      // Transformar datos para cada sección
+      const transformAnime = (anime) => ({
+        animeId: anime.id,
         title: anime.title,
         subtitle: `${anime.year} • ${anime.genre}`,
-        duration: `${anime.rating}/10`,
-        image: anime.cover_image
-      }))
+        genre: anime.genre,
+        image: anime.cover_image,
+        episodeCount: anime.episode_count || 0,
+        audioType: anime.audio_type || 'SUB',
+        ageRating: anime.age_rating,
+        isSimulcast: anime.is_simulcast,
+        rating: anime.rating,
+        progress: 0 // Esto vendría del backend cuando implementes el tracking
+      })
       
-      newReleases.value = popularNow.value.slice(0, 5)
+      // Popular Now - todos los animes
+      popularNow.value = animes.map(transformAnime)
+      
+      // New This Season - animes recientes (por fecha)
+      newThisSeason.value = [...animes]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 10)
+        .map(transformAnime)
+      
+      // Simulcasts - solo animes con is_simulcast=true
+      simulcasts.value = animes
+        .filter(anime => anime.is_simulcast)
+        .map(transformAnime)
+      
+      // Por género
+      actionAnimes.value = animes
+        .filter(anime => anime.genre?.toLowerCase().includes('action') || 
+                         anime.genre?.toLowerCase().includes('acción'))
+        .map(transformAnime)
+      
+      romanceAnimes.value = animes
+        .filter(anime => anime.genre?.toLowerCase().includes('romance'))
+        .map(transformAnime)
+      
+      comedyAnimes.value = animes
+        .filter(anime => anime.genre?.toLowerCase().includes('comedy') || 
+                         anime.genre?.toLowerCase().includes('comedia'))
+        .map(transformAnime)
+      
+      // Continue Watching - formato horizontal con datos de episodio
+      continueWatching.value = animes.slice(0, 6).map((anime, index) => ({
+        animeId: anime.id,
+        title: anime.title,
+        episodeNumber: Math.floor(Math.random() * 12) + 1,
+        episodeTitle: null,
+        thumbnail: anime.background_image || anime.cover_image,
+        progress: 25 + (index * 10), // Progreso simulado
+        duration: '24m',
+        audioType: anime.audio_type || 'SUB'
+      }))
     }
   } catch (error) {
     console.error('Error loading animes:', error)
@@ -84,36 +173,59 @@ async function handleLogout() {
   }
 }
 
+function goToTestWatch() {
+  // Usar el primer anime disponible o uno específico para pruebas
+  const testAnimeId = featuredAnimes.value[0]?.id || popularNow.value[0]?.id || 1
+  const testEpisodeId = 1 // Episodio de prueba
+  
+  router.push({
+    path: '/watch',
+    query: {
+      anime: testAnimeId,
+      episode: testEpisodeId
+    }
+  })
+}
+
 onMounted(async () => {
   const user = await loadCurrentUser()
   if (!user) {
     router.push('/login')
   }
   await loadAnimes()
-  startAutoplay()
+  if (featuredAnimes.value.length > 0) {
+    startAutoplay()
+  }
 })
 </script>
 
 <template>
-  <div class="min-h-screen bg-black text-white">
-    <!-- Header -->
+  <div class="home-container">
+    <!-- Header estilo Crunchyroll -->
     <header class="header">
       <div class="header-content">
         <div class="header-left">
-          <h1 class="logo">AniToki</h1>
+          <img src="/Logo_AniToki.png" alt="AniToki" class="logo" />
           <nav class="nav-links">
-            <a href="#popular" class="nav-link">Popular</a>
-            <a href="#categorias" class="nav-link">Categorías</a>
-            <a href="#tienda" class="nav-link">Tienda</a>
+            <a href="#popular" class="nav-link">Explorar</a>
+            <a href="#manga" class="nav-link">Manga</a>
+            <a href="#noticias" class="nav-link">Noticias</a>
           </nav>
         </div>
         <div class="header-right">
+          <button class="btn-search">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+          </button>
+          
           <button 
             v-if="currentUser?.username === 'admin'" 
             @click="router.push('/backoffice')" 
             class="btn-admin"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="3" width="7" height="7"></rect>
               <rect x="14" y="3" width="7" height="7"></rect>
               <rect x="14" y="14" width="7" height="7"></rect>
@@ -121,18 +233,31 @@ onMounted(async () => {
             </svg>
             Gestión
           </button>
-          <button class="btn-mi-lista">Mi Lista</button>
-          <div v-if="currentUser" class="user-menu">
+
+          <!-- Botón de prueba para WatchAnime -->
+          <button 
+            @click="goToTestWatch" 
+            class="btn-test-watch"
+            title="Ver reproductor (PRUEBA)"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Reproductor
+          </button>
+          
+          <button class="btn-watchlist">Mi Lista</button>
+          
+          <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
               <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
             <button class="btn-logout" @click="handleLogout">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
                 <line x1="21" y1="12" x2="9" y2="12"></line>
               </svg>
-              <span>Cerrar Sesión</span>
             </button>
           </div>
         </div>
@@ -140,37 +265,65 @@ onMounted(async () => {
     </header>
 
     <!-- Hero Banner Carousel -->
-    <section class="hero" @mouseenter="stopAutoplay" @mouseleave="startAutoplay">
+    <section 
+      class="hero-banner" 
+      @mouseenter="stopAutoplay" 
+      @mouseleave="startAutoplay"
+      v-if="featuredAnimes.length > 0"
+    >
       <div class="hero-carousel">
         <div 
           v-for="(anime, index) in featuredAnimes" 
           :key="anime.id"
           class="hero-slide"
           :class="{ active: index === currentSlide }"
-          :style="{ backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(10, 10, 10, 0.95)), url('${anime.background}')` }"
         >
+          <div 
+            class="hero-background"
+            :style="{ 
+              backgroundImage: `url('${anime.background}')` 
+            }"
+          ></div>
+          <div class="hero-overlay"></div>
           <div class="hero-content">
-            <div class="hero-text">
-              <h1 class="hero-logo-text">{{ anime.title }}</h1>
-              <h2 class="hero-title">{{ anime.year }} | {{ anime.genre }}</h2>
-              <p class="hero-description">{{ anime.description }}</p>
-              <div class="hero-buttons">
-                <button class="btn-watch">
-                  <span class="play-icon">▶</span>
-                  COMENZAR A VER!!!
-                </button>
-                <button class="btn-add">+</button>
-              </div>
+            <h1 class="hero-title">{{ anime.title }}</h1>
+            <div class="hero-meta">
+              <span class="hero-year">{{ anime.year }}</span>
+              <span class="hero-divider">•</span>
+              <span class="hero-genre">{{ anime.genre }}</span>
+              <span class="hero-divider">•</span>
+              <span class="hero-rating">⭐ {{ anime.rating }}/10</span>
+              <template v-if="anime.currentEpisode > 0 && !anime.watched">
+                <span class="hero-divider">•</span>
+                <span class="hero-progress">{{ anime.currentEpisode }}/{{ anime.totalEpisodes }} episodios</span>
+              </template>
+            </div>
+            <p class="hero-description">{{ anime.description }}</p>
+            <div class="hero-actions">
+              <button class="btn-hero-play" @click="router.push(`/watch?anime=${anime.id}`)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+                {{ getWatchButtonText(anime) }}
+              </button>
+              <button class="btn-hero-info">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M12 16v-4"></path>
+                  <path d="M12 8h.01"></path>
+                </svg>
+                MÁS INFO
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Navigation Controls -->
-      <button class="carousel-btn prev" @click="prevSlide">‹</button>
-      <button class="carousel-btn next" @click="nextSlide">›</button>
+      <!-- Controles del carrusel -->
+      <button class="carousel-nav prev" @click="prevSlide" aria-label="Anterior">‹</button>
+      <button class="carousel-nav next" @click="nextSlide" aria-label="Siguiente">›</button>
 
-      <!-- Indicators -->
+      <!-- Indicadores -->
       <div class="carousel-indicators">
         <button
           v-for="(anime, index) in featuredAnimes"
@@ -178,74 +331,241 @@ onMounted(async () => {
           class="indicator"
           :class="{ active: index === currentSlide }"
           @click="goToSlide(index)"
+          :aria-label="`Slide ${index + 1}`"
         ></button>
       </div>
     </section>
 
-    <!-- Continue Watching -->
-    <section class="content-section">
-      <h2 class="section-title">Continue Watching</h2>
-      <div class="cards-grid">
-        <AnimeCard
-          v-for="item in continueWatching"
-          :key="item.id"
-          :title="item.title"
-          :subtitle="item.subtitle"
-          :duration="item.duration"
-          :image="item.image"
-        />
-      </div>
-    </section>
+    <!-- Contenido principal -->
+    <main class="main-content">
+      
+      <!-- Continue Watching -->
+      <section v-if="continueWatching.length > 0" class="content-section">
+        <div class="section-header">
+          <h2 class="section-title">Continuar Viendo</h2>
+          <p class="section-subtitle">Retoma donde lo dejaste</p>
+        </div>
+        <div class="carousel-container">
+          <button 
+            class="carousel-arrow prev" 
+            @click="scrollCarousel('.carousel-continue', 'prev')"
+          >‹</button>
+          <div class="carousel-track carousel-continue carousel-horizontal">
+            <ContinueWatchingCard
+              v-for="item in continueWatching"
+              :key="item.animeId"
+              v-bind="item"
+            />
+          </div>
+          <button 
+            class="carousel-arrow next" 
+            @click="scrollCarousel('.carousel-continue', 'next')"
+          >›</button>
+        </div>
+      </section>
 
-    <!-- Popular Now -->
-    <section class="content-section">
-      <h2 class="section-title">Popular Now</h2>
-      <div class="cards-grid">
-        <AnimeCard
-          v-for="item in popularNow"
-          :key="item.id"
-          :anime-id="item.id"
-          :title="item.title"
-          :subtitle="item.subtitle"
-          :duration="item.duration"
-          :image="item.image"
-        />
-      </div>
-    </section>
+      <!-- New This Season -->
+      <section v-if="newThisSeason.length > 0" class="content-section">
+        <div class="section-header">
+          <h2 class="section-title">Nuevos Esta Temporada</h2>
+          <p class="section-subtitle">Los estrenos más recientes</p>
+        </div>
+        <div class="carousel-container">
+          <button 
+            class="carousel-arrow prev" 
+            @click="scrollCarousel('.carousel-new', 'prev')"
+          >‹</button>
+          <div class="carousel-track carousel-new">
+            <AnimeCard
+              v-for="item in newThisSeason"
+              :key="item.animeId"
+              v-bind="item"
+            />
+          </div>
+          <button 
+            class="carousel-arrow next" 
+            @click="scrollCarousel('.carousel-new', 'next')"
+          >›</button>
+        </div>
+      </section>
 
-    <!-- New Releases -->
-    <section class="content-section">
-      <h2 class="section-title">New Releases</h2>
-      <div class="cards-grid">
-        <AnimeCard
-          v-for="item in newReleases"
-          :key="item.id"
-          :anime-id="item.id"
-          :title="item.title"
-          :subtitle="item.subtitle"
-          :duration="item.duration"
-          :image="item.image"
-        />
+      <!-- Simulcasts -->
+      <section v-if="simulcasts.length > 0" class="content-section">
+        <div class="section-header">
+          <h2 class="section-title">Simulcasts</h2>
+          <p class="section-subtitle">Episodios el mismo día que Japón</p>
+        </div>
+        <div class="carousel-container">
+          <button 
+            class="carousel-arrow prev" 
+            @click="scrollCarousel('.carousel-simulcast', 'prev')"
+          >‹</button>
+          <div class="carousel-track carousel-simulcast">
+            <AnimeCard
+              v-for="item in simulcasts"
+              :key="item.animeId"
+              v-bind="item"
+            />
+          </div>
+          <button 
+            class="carousel-arrow next" 
+            @click="scrollCarousel('.carousel-simulcast', 'next')"
+          >›</button>
+        </div>
+      </section>
+
+      <!-- Popular Now -->
+      <section v-if="popularNow.length > 0" class="content-section">
+        <div class="section-header">
+          <h2 class="section-title">Popular Ahora</h2>
+          <p class="section-subtitle">Lo más visto de la comunidad</p>
+        </div>
+        <div class="carousel-container">
+          <button 
+            class="carousel-arrow prev" 
+            @click="scrollCarousel('.carousel-popular', 'prev')"
+          >‹</button>
+          <div class="carousel-track carousel-popular">
+            <AnimeCard
+              v-for="item in popularNow"
+              :key="item.animeId"
+              v-bind="item"
+            />
+          </div>
+          <button 
+            class="carousel-arrow next" 
+            @click="scrollCarousel('.carousel-popular', 'next')"
+          >›</button>
+        </div>
+      </section>
+
+      <!-- Action -->
+      <section v-if="actionAnimes.length > 0" class="content-section">
+        <div class="section-header">
+          <h2 class="section-title">Acción</h2>
+          <p class="section-subtitle">Peleas épicas y aventuras intensas</p>
+        </div>
+        <div class="carousel-container">
+          <button 
+            class="carousel-arrow prev" 
+            @click="scrollCarousel('.carousel-action', 'prev')"
+          >‹</button>
+          <div class="carousel-track carousel-action">
+            <AnimeCard
+              v-for="item in actionAnimes"
+              :key="item.animeId"
+              v-bind="item"
+            />
+          </div>
+          <button 
+            class="carousel-arrow next" 
+            @click="scrollCarousel('.carousel-action', 'next')"
+          >›</button>
+        </div>
+      </section>
+
+      <!-- Romance -->
+      <section v-if="romanceAnimes.length > 0" class="content-section">
+        <div class="section-header">
+          <h2 class="section-title">Romance</h2>
+          <p class="section-subtitle">Historias de amor que te emocionarán</p>
+        </div>
+        <div class="carousel-container">
+          <button 
+            class="carousel-arrow prev" 
+            @click="scrollCarousel('.carousel-romance', 'prev')"
+          >‹</button>
+          <div class="carousel-track carousel-romance">
+            <AnimeCard
+              v-for="item in romanceAnimes"
+              :key="item.animeId"
+              v-bind="item"
+            />
+          </div>
+          <button 
+            class="carousel-arrow next" 
+            @click="scrollCarousel('.carousel-romance', 'next')"
+          >›</button>
+        </div>
+      </section>
+
+      <!-- Comedy -->
+      <section v-if="comedyAnimes.length > 0" class="content-section">
+        <div class="section-header">
+          <h2 class="section-title">Comedia</h2>
+          <p class="section-subtitle">Risas garantizadas</p>
+        </div>
+        <div class="carousel-container">
+          <button 
+            class="carousel-arrow prev" 
+            @click="scrollCarousel('.carousel-comedy', 'prev')"
+          >‹</button>
+          <div class="carousel-track carousel-comedy">
+            <AnimeCard
+              v-for="item in comedyAnimes"
+              :key="item.animeId"
+              v-bind="item"
+            />
+          </div>
+          <button 
+            class="carousel-arrow next" 
+            @click="scrollCarousel('.carousel-comedy', 'next')"
+          >›</button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <p>&copy; 2026 AniToki. Todos los derechos reservados.</p>
+        <div class="footer-links">
+          <a href="#">Términos</a>
+          <a href="#">Privacidad</a>
+          <a href="#">Contacto</a>
+        </div>
       </div>
-    </section>
+    </footer>
   </div>
 </template>
 
 <style scoped>
-/* Header */
+/* Variables de color - Tema morado estilo Crunchyroll */
+:root {
+  --color-primary: #9333ea;
+  --color-primary-light: #a855f7;
+  --color-primary-dark: #7e22ce;
+  --color-bg-main: #000000;
+  --color-bg-secondary: #0a0a0a;
+  --color-bg-tertiary: #141414;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a0a0a0;
+  --color-text-tertiary: #707070;
+}
+
+.home-container {
+  min-height: 100vh;
+  background: var(--color-bg-main);
+  color: var(--color-text-primary);
+}
+
+/* ===== HEADER ===== */
 .header {
-  background: rgba(10, 10, 10, 0.95);
-  backdrop-filter: blur(10px);
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  left: 0;
+  right: 0;
+  background: rgba(10, 10, 10, 0.98);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .header-content {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 1rem 2rem;
+  padding: 1rem 2.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -258,10 +578,10 @@ onMounted(async () => {
 }
 
 .logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #a855f7;
-  margin: 0;
+  height: 45px;
+  width: auto;
+  object-fit: contain;
+  cursor: pointer;
 }
 
 .nav-links {
@@ -270,14 +590,32 @@ onMounted(async () => {
 }
 
 .nav-link {
-  color: #fff;
+  color: var(--color-text-primary);
   text-decoration: none;
   font-size: 0.95rem;
-  transition: color 0.2s;
+  font-weight: 500;
+  transition: color 0.2s ease;
+  position: relative;
 }
 
 .nav-link:hover {
-  color: #a855f7;
+  color: var(--color-primary-light);
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+
+.nav-link:hover::after {
+  transform: scaleX(1);
 }
 
 .header-right {
@@ -286,105 +624,138 @@ onMounted(async () => {
   gap: 1rem;
 }
 
-.user-menu {
+.btn-search {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--color-text-primary);
+  padding: 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: center;
 }
 
-.btn-mi-lista {
+.btn-search:hover {
+  background: rgba(147, 51, 234, 0.1);
+  border-color: var(--color-primary);
+}
+
+.btn-watchlist {
   background: transparent;
-  border: 1px solid #a855f7;
-  color: #a855f7;
-  padding: 0.5rem 1.5rem;
+  border: 1.5px solid var(--color-primary);
+  color: var(--color-primary);
+  padding: 0.6rem 1.5rem;
   border-radius: 6px;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
-.btn-mi-lista:hover {
-  background: #a855f7;
+.btn-watchlist:hover {
+  background: var(--color-primary);
   color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
 }
 
 .btn-admin {
   background: linear-gradient(135deg, #ef4444, #dc2626);
   border: none;
   color: #fff;
-  padding: 0.5rem 1.5rem;
+  padding: 0.6rem 1.5rem;
   border-radius: 6px;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .btn-admin:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
 }
 
-.btn-profile {
-  background: #a855f7;
+.btn-test-watch {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: none;
   color: #fff;
-  padding: 0.5rem 1rem;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  cursor: pointer;
-  width: 45px;
-  height: 45px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 1.1rem;
-  transition: all 0.3s;
-}
-
-.btn-profile:hover {
-  background: #9333ea;
-  transform: scale(1.1);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.btn-profile span {
-  display: block;
-}
-
-.btn-logout {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.5rem;
   border-radius: 6px;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
 }
 
-.btn-logout span {
-  display: inline;
+.btn-test-watch:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.5);
+}
+
+.user-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-profile {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: #fff;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.btn-profile:hover {
+  transform: scale(1.1);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
+}
+
+.btn-logout {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--color-text-primary);
+  padding: 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
 }
 
 .btn-logout:hover {
-  background: rgba(255, 77, 77, 0.2);
-  border-color: #ff4d4d;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
 }
 
-/* Hero Banner Carousel */
-.hero {
+/* ===== HERO BANNER ===== */
+.hero-banner {
   position: relative;
-  height: 500px;
+  margin-top: 72px; /* Altura del header */
+  height: 600px;
   overflow: hidden;
+  margin-bottom: 2rem; /* Separación con el contenido */
 }
 
 .hero-carousel {
@@ -395,16 +766,9 @@ onMounted(async () => {
 
 .hero-slide {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-size: cover;
-  background-position: center;
-  display: flex;
-  align-items: center;
+  inset: 0;
   opacity: 0;
-  transition: opacity 0.8s ease-in-out;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
 }
 
@@ -413,182 +777,385 @@ onMounted(async () => {
   pointer-events: auto;
 }
 
-.carousel-btn {
+.hero-background {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(3px);
+  transform: scale(1.1);
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: 
+  linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.85) 30%,
+    rgba(0, 0, 0, 0.5) 50%,
+    rgba(0, 0, 0, 0.2) 70%,
+    transparent 100%
+  ),
+  linear-gradient(
+    to top,
+    #000000 0%,
+    rgba(0, 0, 0, 0.95) 15%,
+    rgba(0, 0, 0, 0.7) 30%,
+    rgba(0, 0, 0, 0.4) 50%,
+    rgba(0, 0, 0, 0.15) 70%,
+    transparent 100%
+  );
+}
+
+.hero-content {
+  position: relative;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2.5rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 4rem;
+  z-index: 1;
+}
+
+.hero-content > * {
+  max-width: 650px;
+}
+
+.hero-title {
+  font-size: 3rem;
+  font-weight: 900;
+  color: #fff;
+  margin: 0 0 0.75rem 0;
+  line-height: 1.1;
+  text-shadow: 2px 4px 16px rgba(0, 0, 0, 0.9);
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
+}
+
+.hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 1px 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+.hero-divider {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.hero-rating {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.hero-progress {
+  color: var(--color-primary-light);
+  font-weight: 600;
+}
+
+.hero-description {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 1.75rem;
+  max-width: 600px;
+  text-shadow: 1px 2px 10px rgba(0, 0, 0, 0.9);
+  
+  /* Limitar a 3 líneas con puntos suspensivos */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-hero-play {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(147, 51, 234, 0.3);
+  letter-spacing: 0.5px;
+}
+
+.btn-hero-play:hover {
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(147, 51, 234, 0.5);
+}
+
+.btn-hero-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+}
+
+.btn-hero-info:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Controles del carrusel */
+.carousel-nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(0, 0, 0, 0.5);
-  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: #fff;
   width: 50px;
   height: 50px;
   font-size: 2rem;
   cursor: pointer;
   z-index: 10;
-  transition: background 0.3s;
-  border-radius: 4px;
+  transition: all 0.3s ease;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.carousel-btn:hover {
-  background: rgba(0, 0, 0, 0.8);
+.carousel-nav:hover {
+  background: rgba(147, 51, 234, 0.7);
+  border-color: var(--color-primary);
 }
 
-.carousel-btn.prev {
+.carousel-nav.prev {
   left: 2rem;
 }
 
-.carousel-btn.next {
+.carousel-nav.next {
   right: 2rem;
 }
 
 .carousel-indicators {
   position: absolute;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 2.5rem;
+  left: 2.5rem;
   display: flex;
-  gap: 0.5rem;
+  gap: 0.6rem;
   z-index: 10;
 }
 
 .indicator {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.4);
   border: none;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  padding: 0;
 }
 
 .indicator.active {
-  background: #a855f7;
-  width: 30px;
-  border-radius: 6px;
+  background: var(--color-primary);
+  width: 36px;
+  border-radius: 7px;
 }
 
 .indicator:hover {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.7);
 }
 
-.hero-content {
+/* ===== MAIN CONTENT ===== */
+.main-content {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 2rem;
-  width: 100%;
+  padding: 4rem 2.5rem 3rem;
+  position: relative;
+  z-index: 10;
 }
 
-.hero-text {
-  max-width: 600px;
-}
-
-.hero-logo-text {
-  font-size: 4rem;
-  font-weight: 700;
-  color: #a855f7;
-  margin: 0 0 1rem 0;
-  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
-}
-
-.hero-title {
-  font-size: 1rem;
-  color: #999;
-  margin-bottom: 1rem;
-  font-weight: 400;
-}
-
-.hero-description {
-  font-size: 1.1rem;
-  line-height: 1.6;
-  color: #ddd;
-  margin-bottom: 2rem;
-}
-
-.hero-buttons {
-  display: flex;
-  align-items: center;
-}
-
-.btn-watch {
-  background: #a855f7;
-  color: #fff;
-  border: none;
-  padding: 0.8rem 2rem;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: background 0.2s;
-}
-
-.btn-watch:hover {
-  background: #9333ea;
-}
-
-.play-icon {
-  font-size: 0.8rem;
-}
-
-.btn-add {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-size: 1.5rem;
-  cursor: pointer;
-  margin-left: 1rem;
-  transition: all 0.2s;
-}
-
-.btn-add:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-/* Content Sections */
 .content-section {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2rem 2rem;
+  margin-bottom: 3.5rem;
+}
+
+.content-section:first-child {
+  margin-top: 1rem;
+}
+
+.section-header {
+  margin-bottom: 1.5rem;
 }
 
 .section-title {
-  font-size: 1.5rem;
-  font-weight: 300;
-  margin-bottom: 1.5rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.5px;
+}
+
+.section-subtitle {
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Carrusel horizontal */
+.carousel-container {
+  position: relative;
+}
+
+.carousel-track {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  padding: 0.5rem 0;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.carousel-track::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.carousel-track > * {
+  flex: 0 0 200px; /* Ancho fijo para cards verticales */
+}
+
+/* Cards horizontales para Continue Watching */
+.carousel-track.carousel-horizontal > * {
+  flex: 0 0 320px; /* Ancho para formato 16:9 */
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: #fff;
+  width: 45px;
+  height: 45px;
+  font-size: 1.8rem;
+  cursor: pointer;
+  z-index: 50;
+  transition: all 0.3s ease;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1.5rem;
+.carousel-container:hover .carousel-arrow {
+  opacity: 1;
+  pointer-events: auto;
 }
 
+.carousel-arrow:hover {
+  background: rgba(147, 51, 234, 0.9);
+  border-color: var(--color-primary);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-arrow.prev {
+  left: -22px;
+}
+
+.carousel-arrow.next {
+  right: -22px;
+}
+
+/* ===== FOOTER ===== */
+.footer {
+  background: var(--color-bg-secondary);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 2rem 0;
+  margin-top: 4rem;
+}
+
+.footer-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-content p {
+  color: var(--color-text-tertiary);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.footer-links {
+  display: flex;
+  gap: 2rem;
+}
+
+.footer-links a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.2s ease;
+}
+
+.footer-links a:hover {
+  color: var(--color-primary-light);
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .header-content {
-    padding: 1rem;
+    padding: 1rem 1.5rem;
   }
-
+  
   .nav-links {
     display: none;
   }
-
-  .hero {
-    height: 400px;
+  
+  .hero-title {
+    font-size: 2.5rem;
   }
-
-  .cards-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 1rem;
+  
+  .main-content {
+    padding: 2rem 1.5rem;
   }
-
-  .content-section {
-    padding: 1.5rem 1rem;
+  
+  .carousel-track > * {
+    flex: 0 0 150px;
   }
 }
 </style>

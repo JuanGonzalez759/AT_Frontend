@@ -93,6 +93,11 @@ async function confirmDelete() {
       animes.value = animes.value.filter(a => a.id !== animeToDelete.value.id)
       console.log('Anime eliminado exitosamente')
       closeDeleteModal()
+    } else if (response.status === 404) {
+      // El anime ya no existe, eliminarlo de la lista local
+      animes.value = animes.value.filter(a => a.id !== animeToDelete.value.id)
+      console.log('Anime ya no existe en el servidor, removido de la lista')
+      closeDeleteModal()
     } else {
       const error = await response.json()
       console.error('Error al eliminar:', error)
@@ -118,7 +123,10 @@ function getCookie(name) {
   <div class="admin-container">
     <!-- Header -->
     <header class="admin-header">
-      <h1 class="logo">AniToki <span class="badge">ADMIN</span></h1>
+      <div class="logo-container">
+        <img src="/Logo_AniToki.png" alt="AniToki" class="logo-image" />
+        <span class="badge">ADMIN</span>
+      </div>
       <div class="header-actions">
         <button class="btn-home" @click="goToHome">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -261,14 +269,16 @@ function getCookie(name) {
   backdrop-filter: blur(10px);
 }
 
-.logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #a855f7;
-  margin: 0;
+.logo-container {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.logo-image {
+  height: 45px;
+  width: auto;
+  object-fit: contain;
 }
 
 .badge {

@@ -16,6 +16,7 @@ const editForm = ref({
 })
 
 const availableAvatars = ref([
+  '/Avatar_Anitoki.png',
   '/profiles/Profile1.png',
   '/profiles/Profile2.png',
   '/profiles/Profile3.png',
@@ -23,6 +24,7 @@ const availableAvatars = ref([
 ])
 
 const availableBackgrounds = ref([
+  { name: 'Anitoki', url: '/Background_profiles.png' },
   { name: 'One Piece', url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1600&h=900&fit=crop' },
   { name: 'Attack on Titan', url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=1600&h=900&fit=crop' },
   { name: 'Demon Slayer', url: 'https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=1600&h=900&fit=crop' },
@@ -134,7 +136,7 @@ function closeGallery() {
 <template>
   <div class="profile-container">
     <div class="profile-header">
-      <h1 class="logo">AniToki</h1>
+      <img src="/Logo_AniToki.png" alt="AniToki" class="logo" />
     </div>
 
     <div class="profile-content">
@@ -304,10 +306,10 @@ function closeGallery() {
 }
 
 .logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #a855f7;
-  margin: 0;
+  height: 60px;
+  width: auto;
+  object-fit: contain;
+  cursor: pointer;
 }
 
 .profile-content {
@@ -680,7 +682,17 @@ function closeGallery() {
   overflow: hidden;
   cursor: pointer;
   transition: all 0.3s;
-  background: rgba(255, 255, 255, 0.05);
+  background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%);
+  position: relative;
+}
+
+.avatar-gallery-option::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('/Background_profiles.png') center/cover;
+  opacity: 0.15;
+  z-index: 0;
 }
 
 .avatar-gallery-option:hover {
@@ -698,6 +710,8 @@ function closeGallery() {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  position: relative;
+  z-index: 1;
 }
 
 .background-gallery {

@@ -157,7 +157,9 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen flex items-center justify-center bg-black text-white">
-    <a href="#" class="absolute top-6 left-6 text-purple-400 font-semibold">AniToki</a>
+    <a href="#" class="absolute top-6 left-6">
+      <img src="/Logo_AniToki.png" alt="AniToki" class="h-10" />
+    </a>
 
     <div class="w-full max-w-sm px-6">
       <div class="text-center mb-6">

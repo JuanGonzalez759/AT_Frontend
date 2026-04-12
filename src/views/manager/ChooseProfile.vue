@@ -23,7 +23,7 @@ const availableAvatars = ref([
 ])
 
 const availableBackgrounds = ref([
-  { name: 'One Piece', url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1600&h=900&fit=crop' },
+  { name: 'One Piece', url: 'https://imgs.search.brave.com/PL9srwfIfH53eZatSvM12DTYcYznYqBPjZe6RRWtVvg/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly93YWxs/cGFwZXJjYXQuY29t/L3cvZnVsbC8zLzMv/Ni8xMjY5MzctMzg0/MHgyMTYwLWRlc2t0/b3AtNGstb25lLXBp/ZWNlLWJhY2tncm91/bmQtaW1hZ2UuanBn' },
   { name: 'Attack on Titan', url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=1600&h=900&fit=crop' },
   { name: 'Demon Slayer', url: 'https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=1600&h=900&fit=crop' },
   { name: 'Jujutsu Kaisen', url: 'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=1600&h=900&fit=crop' },

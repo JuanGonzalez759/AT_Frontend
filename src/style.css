@@ -1,8 +1,28 @@
 :root {
+  /* Paleta Morada tipo Crunchyroll */
   --bg: #000000;
-  --muted: #bdbdbd;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #141414;
+  
+  /* Morado principal */
+  --purple-primary: #9333ea;
+  --purple-light: #a855f7;
+  --purple-dark: #7e22ce;
+  --purple-darker: #6b21a8;
+  
+  /* Textos */
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #707070;
+  --text-muted: #505050;
+  
+  /* Bordes y líneas */
   --line: rgba(255, 255, 255, 0.08);
-  --purple: #812e96;
+  --line-light: rgba(255, 255, 255, 0.12);
+  
+  /* Compatibilidad legacy */
+  --muted: var(--text-secondary);
+  --purple: var(--purple-primary);
 }
 
 * {
@@ -49,7 +69,7 @@ body {
 }
 
 .input-field:focus {
-  border-bottom-color: rgba(129, 46, 150, 0.9);
+  border-bottom-color: var(--purple-light);
   outline: none;
   box-shadow: none;
 }
@@ -74,7 +94,7 @@ input:-moz-focusring {
 
 /* selection inside the input: visible purple tint */
 .input-field::selection {
-  background: rgba(129, 46, 150, 0.4);
+  background: rgba(147, 51, 234, 0.4);
   color: #fff;
 }
 
