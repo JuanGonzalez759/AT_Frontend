@@ -1081,7 +1081,10 @@ onMounted(async () => {
 }
 
 .carousel-track > * {
-  flex: 0 0 200px; /* Ancho fijo para cards verticales */
+  flex: 0 0 180px; /* Ancho fijo para cards verticales */
+  width: 180px;
+  min-width: 180px;
+  max-width: 180px;
 }
 
 /* Cards horizontales para Continue Watching */

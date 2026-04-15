@@ -17,12 +17,29 @@ const animeForm = ref({
 const isSaving = ref(false)
 const errorMessage = ref('')
 
+// Modal de error
+const showErrorModal = ref(false)
+const errorModalMessage = ref('')
+const errorModalTitle = ref('Error')
+
 // Jikan API Search
 const searchQuery = ref('')
 const searchResults = ref([])
 const isSearching = ref(false)
 const showResults = ref(false)
 let searchTimeout = null
+
+function showError(title, message) {
+  errorModalTitle.value = title
+  errorModalMessage.value = message
+  showErrorModal.value = true
+}
+
+function closeErrorModal() {
+  showErrorModal.value = false
+  errorModalTitle.value = 'Error'
+  errorModalMessage.value = ''
+}
 
 function getCookie(name) {
   const value = `; ${document.cookie}`
@@ -67,14 +84,24 @@ function searchJikan() {
         searchResults.value = data.results || []
         showResults.value = true
       } else if (response.status === 429) {
-        console.warn('Rate limit excedido. Intenta de nuevo en unos segundos')
+        const errorData = await response.json()
+        showError('⏱️ Límite de búsqueda alcanzado', errorData.message || 'Has realizado demasiadas búsquedas. Por favor, espera unos segundos e intenta de nuevo.')
+        searchResults.value = []
+      } else if (response.status === 504) {
+        showError('⏱️ Tiempo de espera agotado', 'La API de MyAnimeList no respondió a tiempo. Por favor, usa el formulario manual abajo.')
+        searchResults.value = []
+      } else if (response.status === 500) {
+        showError('⚠️ Servicio no disponible', 'MyAnimeList API está experimentando problemas en este momento. Por favor, usa el formulario manual abajo para agregar el anime.')
         searchResults.value = []
       } else {
-        console.error('Error searching Jikan API')
+        const errorData = await response.json()
+        console.error('Error searching Jikan API:', errorData)
+        showError('⚠️ Error de búsqueda', errorData.message || 'Error al buscar en MyAnimeList. Por favor, usa el formulario manual abajo.')
         searchResults.value = []
       }
     } catch (error) {
       console.error('Error:', error)
+      showError('🌐 Error de conexión', 'No se pudo conectar con el servidor. Por favor, verifica tu conexión a internet o ingresa los datos manualmente.')
       searchResults.value = []
     } finally {
       isSearching.value = false
@@ -163,6 +190,9 @@ function cancel() {
         <div class="search-header">
           <h2 class="search-title">🔍 Buscar en MyAnimeList</h2>
           <p class="search-subtitle">Importa datos automáticamente desde MyAnimeList</p>
+          <div class="api-status-warning">
+            ⚠️ Si la búsqueda no funciona, la API de MyAnimeList puede estar temporalmente fuera de servicio. Usa el formulario manual abajo.
+          </div>
         </div>
         
         <div class="search-box">
@@ -318,6 +348,26 @@ function cancel() {
           </button>
         </div>
       </form>
+    </div>
+
+    <!-- Modal de Error -->
+    <div v-if="showErrorModal" class="modal-overlay" @click="closeErrorModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-icon modal-icon-warning">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <h2 class="modal-title">{{ errorModalTitle }}</h2>
+        <p class="modal-message">{{ errorModalMessage }}</p>
+        <div class="modal-actions">
+          <button class="btn-modal-ok" @click="closeErrorModal">
+            Entendido
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -543,7 +593,21 @@ function cancel() {
 .search-subtitle {
   font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.6);
-  margin: 0;
+  margin: 0 0 1rem 0;
+}
+
+.api-status-warning {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: #fca5a5;
+  margin-top: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  line-height: 1.4;
 }
 
 .search-box {
@@ -694,6 +758,109 @@ function cancel() {
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 1px;
+}
+
+/* Modal de Error */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  background: linear-gradient(135deg, rgba(30, 30, 30, 0.98), rgba(20, 20, 20, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 1px rgba(168, 85, 247, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-icon-warning {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.modal-title {
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  text-align: center;
+}
+
+.modal-message {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0 0 2rem 0;
+  text-align: center;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-modal-ok {
+  flex: 1;
+  background: linear-gradient(135deg, #a855f7, #9333ea);
+  border: none;
+  color: #fff;
+  padding: 0.9rem 1.5rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.btn-modal-ok:hover {
+  background: linear-gradient(135deg, #9333ea, #7e22ce);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(168, 85, 247, 0.4);
 }
 
 @media (max-width: 768px) {

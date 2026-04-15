@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import Hls from 'hls.js'
@@ -49,6 +49,9 @@ onMounted(async () => {
   }
   await loadAnime()
   await loadEpisodeData()
+  
+  // Esperar a que el DOM esté completamente renderizado
+  await nextTick()
   await loadEpisodeSources()
 })
 
@@ -63,6 +66,7 @@ onBeforeUnmount(() => {
 // Watch para detectar cambios de episodio
 watch([animeId, episodeNumber], async () => {
   await loadEpisodeData()
+  await nextTick()
   await loadEpisodeSources()
 })
 
@@ -124,11 +128,14 @@ async function loadEpisodeSources() {
       `/api/backoffice/consumet/sources/${animeSlug}/${episodeNumber.value}/`
     )
     
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: No se pudo cargar el video`)
-    }
-    
     const data = await response.json()
+    
+    // Verificar si es un video de respaldo (fallback)
+    if (data.fallback) {
+      console.warn('⚠️ Usando video de demostración:', data.message)
+      console.warn('Errores de APIs:', data.errors)
+      // No mostrar error, solo log - el video se cargará normalmente
+    }
     
     if (!data.sources || data.sources.length === 0) {
       throw new Error('No hay fuentes de video disponibles')
@@ -159,29 +166,39 @@ async function setupHlsPlayer(videoUrl, headers = {}) {
     hls.value = null
   }
   
+  // Esperar a que el elemento esté disponible (con reintentos)
   if (!videoPlayer.value) {
-    console.error('Video player element not found')
-    return
+    console.warn('Video player not ready, waiting...')
+    await nextTick()
+    
+    if (!videoPlayer.value) {
+      console.error('Video player element not found after waiting')
+      videoError.value = 'Error: El reproductor de video no está disponible'
+      return
+    }
   }
   
   if (Hls.isSupported()) {
     // Usar HLS.js para navegadores que no soportan HLS nativamente
     hls.value = new Hls({
-      xhrSetup: (xhr) => {
-        // Agregar headers necesarios (Referer, etc)
-        if (headers.Referer) {
-          xhr.setRequestHeader('Referer', headers.Referer)
-        }
-      }
+      // Configuración optimizada para streaming
+      enableWorker: true,
+      lowLatencyMode: false,
     })
     
     hls.value.loadSource(videoUrl)
     hls.value.attachMedia(videoPlayer.value)
     
     hls.value.on(Hls.Events.MANIFEST_PARSED, () => {
-      console.log('Video loaded successfully')
-      videoPlayer.value.play().catch(e => {
-        console.log('Autoplay prevented:', e)
+      console.log('✓ Video cargado correctamente')
+      // Mutear temporalmente para permitir autoplay
+      videoPlayer.value.muted = true
+      videoPlayer.value.play().then(() => {
+        // Unmute después de que comience a reproducir
+        videoPlayer.value.muted = false
+      }).catch(e => {
+        console.log('Autoplay bloqueado por el navegador')
+        videoPlayer.value.muted = false
       })
     })
     
@@ -288,6 +305,11 @@ function goToNextEpisode() {
   }
 }
 
+function retryVideo() {
+  videoError.value = null
+  loadEpisodeSources()
+}
+
 function toggleLike() {
   if (liked.value) {
     liked.value = false
@@ -336,41 +358,42 @@ function goHome() {
   <div class="watch-page">
     <!-- Video Player -->
     <div class="player-container">
-      <div class="player-wrapper" v-if="currentEpisode && !videoError">
+      <div class="player-wrapper">
         <!-- Loading Spinner -->
         <div v-if="isLoadingVideo" class="video-loading">
           <div class="spinner"></div>
           <p>Cargando video...</p>
         </div>
         
-        <!-- Video Element -->
+        <!-- Video Element (siempre presente para que el ref funcione) -->
         <video 
           ref="videoPlayer"
           class="video-player"
           controls
+          preload="metadata"
           @timeupdate="onVideoTimeUpdate"
           @ended="onVideoEnded"
-          v-show="!isLoadingVideo"
+          v-show="!isLoadingVideo && !videoError && currentEpisode"
         ></video>
-      </div>
-      
-      <!-- Error Message -->
-      <div v-else-if="videoError" class="player-error">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-        <p>{{ videoError }}</p>
-        <button class="btn-retry" @click="loadEpisodeSources">Reintentar</button>
-      </div>
-      
-      <!-- Placeholder -->
-      <div v-else class="player-placeholder">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="5 3 19 12 5 21 5 3"></polygon>
-        </svg>
-        <p>Selecciona un episodio para reproducir</p>
+        
+        <!-- Error Message -->
+        <div v-if="videoError" class="player-error">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <p class="error-message">{{ videoError }}</p>
+          <button class="btn-retry" @click="retryVideo">Reintentar</button>
+        </div>
+        
+        <!-- Placeholder -->
+        <div v-else-if="!currentEpisode" class="player-placeholder">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <p>Selecciona un episodio para reproducir</p>
+        </div>
       </div>
     </div>
 
@@ -641,16 +664,21 @@ function goHome() {
   justify-content: center;
   color: #ef4444;
   gap: 1rem;
+  position: relative;
+  padding: 2rem;
 }
 
 .player-error svg {
   opacity: 0.6;
 }
 
-.player-error p {
-  max-width: 400px;
+.player-error .error-message {
+  max-width: 500px;
   text-align: center;
   margin: 0;
+  line-height: 1.6;
+  white-space: pre-line;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .btn-retry {
@@ -788,6 +816,7 @@ function goHome() {
 .description-section p:not(.expanded) {
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
