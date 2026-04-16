@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
@@ -25,6 +25,8 @@ const isLoadingVideo = ref(false)
 const videoError = ref(null)
 const videoProgress = ref(0)
 const videoDuration = ref(0)
+const isYouTubeVideo = ref(false)
+const youtubeEmbedUrl = ref('')
 
 // Estado de interacciones
 const liked = ref(false)
@@ -46,7 +48,9 @@ onMounted(async () => {
   const user = await loadCurrentUser()
   if (!user) {
     router.push('/login')
+    return
   }
+  
   await loadAnime()
   await loadEpisodeData()
   
@@ -113,16 +117,69 @@ async function loadEpisodeData() {
 }
 
 async function loadEpisodeSources() {
-  if (!anime.value || !anime.value.anime_slug) {
-    console.error('No anime slug available')
-    videoError.value = 'anime_slug no configurado en la base de datos'
+  if (!currentEpisode.value) {
+    console.error('No current episode available')
+    videoError.value = 'No hay episodio seleccionado'
     return
   }
 
   isLoadingVideo.value = true
   videoError.value = null
+  isYouTubeVideo.value = false
   
   try {
+    // Verificar si el episodio tiene una URL directa de video
+    if (currentEpisode.value.video_url) {
+      const videoUrl = currentEpisode.value.video_url
+      
+      // Detectar si es un video de YouTube
+      if (videoUrl.includes('youtube.com/embed') || videoUrl.includes('youtu.be') || videoUrl.includes('youtube.com/watch')) {
+        console.log('✔ Video de YouTube detectado')
+        isYouTubeVideo.value = true
+        
+        let videoId = ''
+        
+        // Extraer el ID del video según el formato
+        if (videoUrl.includes('youtu.be')) {
+          videoId = videoUrl.split('youtu.be/')[1].split('?')[0]
+        } else if (videoUrl.includes('youtube.com/embed/')) {
+          videoId = videoUrl.split('youtube.com/embed/')[1].split('?')[0]
+        } else if (videoUrl.includes('youtube.com/watch')) {
+          const urlParams = new URLSearchParams(videoUrl.split('?')[1])
+          videoId = urlParams.get('v')
+        }
+        
+        // Construir URL con parámetros para mejor experiencia
+        const params = new URLSearchParams({
+          autoplay: '1',
+          rel: '0',
+          modestbranding: '1',
+          enablejsapi: '1',
+          origin: window.location.origin
+        })
+        
+        youtubeEmbedUrl.value = `https://www.youtube.com/embed/${videoId}?${params.toString()}`
+        
+        isLoadingVideo.value = false
+        return
+      }
+      
+      // Si no es YouTube, verificar si es M3U8 y cargar con HLS
+      if (videoUrl.includes('.m3u8')) {
+        console.log('✔ Video M3U8 detectado')
+        await setupHlsPlayer(videoUrl, {})
+        isLoadingVideo.value = false
+        return
+      }
+    }
+    
+    // Si no hay video_url directo, usar Consumet API (flujo original)
+    if (!anime.value || !anime.value.anime_slug) {
+      console.error('No anime slug available')
+      videoError.value = 'anime_slug no configurado en la base de datos'
+      return
+    }
+
     const animeSlug = anime.value.anime_slug
     const response = await authenticatedFetch(
       `/api/backoffice/consumet/sources/${animeSlug}/${episodeNumber.value}/`
@@ -190,7 +247,7 @@ async function setupHlsPlayer(videoUrl, headers = {}) {
     hls.value.attachMedia(videoPlayer.value)
     
     hls.value.on(Hls.Events.MANIFEST_PARSED, () => {
-      console.log('✓ Video cargado correctamente')
+      console.log('✔ Video cargado correctamente')
       // Mutear temporalmente para permitir autoplay
       videoPlayer.value.muted = true
       videoPlayer.value.play().then(() => {
@@ -298,9 +355,25 @@ const nextEpisode = computed(() => {
   return null
 })
 
+const previousEpisode = computed(() => {
+  if (!currentEpisode.value || episodes.value.length === 0) return null
+  const currentIndex = episodes.value.findIndex(ep => ep.episode_number === episodeNumber.value)
+  if (currentIndex > 0) {
+    return episodes.value[currentIndex - 1]
+  }
+  return null
+})
+
 function goToNextEpisode() {
   if (nextEpisode.value) {
     selectEpisode(nextEpisode.value)
+    showAllEpisodes.value = false
+  }
+}
+
+function goToPreviousEpisode() {
+  if (previousEpisode.value) {
+    selectEpisode(previousEpisode.value)
     showAllEpisodes.value = false
   }
 }
@@ -356,8 +429,35 @@ function goHome() {
 
 <template>
   <div class="watch-page">
+    <!-- Header Navigation -->
+    <header class="watch-header">
+      <div class="watch-header-content">
+        <div class="header-left">
+          <img src="/Logo_AniToki.png" alt="AniToki" class="logo" @click="goHome" style="cursor: pointer;" />
+          <nav class="nav-links">
+            <a @click="goHome" class="nav-link">Inicio</a>
+            <a @click="router.push('/categories')" class="nav-link">Explorar</a>
+          </nav>
+        </div>
+        <div class="header-right">
+          <button class="btn-search">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+          </button>
+          <button class="btn-watchlist" @click="router.push('/home')">Mi Lista</button>
+          <div v-if="currentUser" class="user-controls">
+            <button @click="router.push('/manager/profiles')" class="btn-profile">
+              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
     <!-- Video Player -->
-    <div class="player-container">
+    <div class="player-section">
       <div class="player-wrapper">
         <!-- Loading Spinner -->
         <div v-if="isLoadingVideo" class="video-loading">
@@ -365,15 +465,25 @@ function goHome() {
           <p>Cargando video...</p>
         </div>
         
-        <!-- Video Element (siempre presente para que el ref funcione) -->
+        <!-- YouTube Iframe -->
+        <iframe 
+          v-if="!isLoadingVideo && !videoError && isYouTubeVideo && youtubeEmbedUrl"
+          :src="youtubeEmbedUrl"
+          class="youtube-player"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        ></iframe>
+        
+        <!-- Video Element HLS -->
         <video 
           ref="videoPlayer"
           class="video-player"
+          v-show="!isLoadingVideo && !videoError && !isYouTubeVideo"
           controls
           preload="metadata"
           @timeupdate="onVideoTimeUpdate"
           @ended="onVideoEnded"
-          v-show="!isLoadingVideo && !videoError && currentEpisode"
         ></video>
         
         <!-- Error Message -->
@@ -398,118 +508,130 @@ function goHome() {
     </div>
 
     <!-- Content Section -->
-    <div class="content-wrapper">
-      <!-- Main Content -->
-      <div class="main-content">
-        <!-- Episode Info -->
-        <div class="episode-header" v-if="currentEpisode">
-          <div class="black-diver">
-            <span>Black Diver</span>
+    <div class="content-container">
+      <div class="content-inner">
+        <!-- Main Content -->
+        <div class="main-content">
+          <!-- Anime Title Link -->
+          <div class="anime-title-link" v-if="anime">
+            <a @click="goHome" style="cursor: pointer;">{{ anime.title }}</a>
           </div>
-          <h1 class="episode-title">
-            E{{ currentEpisode.episode_number }} - {{ currentEpisode.title || 'Asta y Yuno' }}
+
+          <!-- Episode Title -->
+          <h1 class="episode-title" v-if="currentEpisode">
+            E{{ currentEpisode.episode_number }} - {{ currentEpisode.title || `Episodio ${currentEpisode.episode_number}` }}
           </h1>
-          <div class="episode-meta">
-            <span>T1 E{{ currentEpisode.episode_number }}</span>
-            <span class="divider">|</span>
-            <span>Sub</span>
-            <span class="divider">|</span>
-            <span>Vdo</span>
+
+          <!-- Episode Meta -->
+          <div class="episode-meta" v-if="currentEpisode">
+            <span>{{ anime?.audio_type || 'Sub' }} | Dob</span>
+            <span class="release-date" v-if="anime?.year">Lanzado el {{ anime.year }}</span>
           </div>
-          <div class="release-date">
-            Lanzado el 3 mar 2026
-          </div>
-        </div>
 
-        <!-- Interaction Buttons -->
-        <div class="interaction-buttons">
-          <button 
-            class="btn-interaction" 
-            :class="{ active: liked }"
-            @click="toggleLike"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
-            </svg>
-            <span>{{ likeCount }}</span>
-          </button>
-          
-          <button 
-            class="btn-interaction" 
-            :class="{ active: disliked }"
-            @click="toggleDislike"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(180deg)">
-              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
-            </svg>
-            <span>{{ dislikeCount }}</span>
-          </button>
-
-          <button class="btn-interaction" @click="shareEpisode">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="18" cy="5" r="3"></circle>
-              <circle cx="6" cy="12" r="3"></circle>
-              <circle cx="18" cy="19" r="3"></circle>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-            </svg>
-          </button>
-
-          <button 
-            class="btn-interaction" 
-            :class="{ active: saved }"
-            @click="toggleSave"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-            </svg>
-          </button>
-        </div>
-
-        <!-- Description -->
-        <div class="description-section" v-if="currentEpisode">
-          <p :class="{ expanded: showFullDescription }">
-            {{ currentEpisode.description || 'Dos huérfanos son abandonados en la parroquia una iglesia, y tras varios años, ambos son jóvenes seguridores, Yuno es un joven de mago natural talento que aspira a ser Rey Mago. Asta es lo supera carece de aptitud mágica alguna y depende solo de su fuerza, pero tiene el mismo objetivo que su amigo ser Rey Mago. Asta confía en que le entrega de su grimorio mágico le permitirá...' }}
-          </p>
-          <button class="btn-show-more" @click="showFullDescription = !showFullDescription">
-            {{ showFullDescription ? 'VER MENOS -' : 'VER MÁS +' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Sidebar -->
-      <div class="sidebar">
-        <!-- Next Episode Card -->
-        <div class="next-episode-card" v-if="nextEpisode">
-          <div class="next-episode-label">SIGUIENTE EPISODIO</div>
-          <div class="next-episode-thumbnail" @click="goToNextEpisode">
-            <img 
-              :src="nextEpisode.thumbnail || anime?.cover_image" 
-              :alt="nextEpisode.title"
-            />
-            <div class="play-overlay">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          <!-- Interaction Buttons -->
+          <div class="interaction-buttons" v-if="currentEpisode">
+            <button class="btn-like" :class="{ active: liked }" @click="toggleLike">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
               </svg>
-            </div>
+              <span>{{ likeCount }}</span>
+            </button>
+            
+            <button class="btn-dislike" :class="{ active: disliked }" @click="toggleDislike">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(180deg)">
+                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+              </svg>
+              <span>{{ dislikeCount }}</span>
+            </button>
+
+            <button class="btn-share" @click="shareEpisode">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+            </button>
           </div>
-          <div class="next-episode-info">
-            <div class="next-episode-title">
-              E{{ nextEpisode.episode_number }} - {{ nextEpisode.title || 'El juramento del muchacho' }}
-            </div>
-            <div class="next-episode-meta">
-              Dob | Sub
-            </div>
-            <div class="next-episode-duration">
-              12m
-            </div>
+
+          <!-- Description -->
+          <div class="description-section" v-if="currentEpisode || anime">
+            <p :class="{ expanded: showFullDescription }">
+              {{ currentEpisode?.description || anime?.description || 'Sin descripción disponible.' }}
+            </p>
+            <button 
+              class="btn-show-more" 
+              @click="showFullDescription = !showFullDescription"
+              v-if="(currentEpisode?.description || anime?.description)?.length > 150"
+            >
+              {{ showFullDescription ? 'VER MENOS' : 'VER MÁS' }}
+            </button>
           </div>
         </div>
 
-        <!-- View More Episodes Button -->
-        <button class="btn-view-episodes" @click="showAllEpisodes = true">
-          VER MÁS EPISODIOS
-        </button>
+        <!-- Sidebar -->
+        <aside class="sidebar">
+          <!-- Next Episode Card -->
+          <div class="next-episode-card" v-if="nextEpisode && anime">
+            <div class="next-episode-label">SIGUIENTE EPISODIO</div>
+            <div class="next-episode-content" @click="goToNextEpisode">
+              <div class="next-episode-thumbnail">
+                <img 
+                  :src="nextEpisode.thumbnail || anime.cover_image" 
+                  :alt="nextEpisode.title"
+                />
+                <div class="play-overlay">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </div>
+              </div>
+              <div class="next-episode-info">
+                <div class="next-episode-title">
+                  E{{ nextEpisode.episode_number }} - {{ nextEpisode.title || `Episodio ${nextEpisode.episode_number}` }}
+                </div>
+                <div class="next-episode-meta">
+                  {{ anime.audio_type || 'Sub' }}
+                </div>
+                <div class="next-episode-duration">
+                  {{ nextEpisode.duration || '24' }}m
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Previous Episode Card -->
+          <div class="prev-episode-card" v-if="previousEpisode && anime">
+            <div class="prev-episode-label">EPISODIO ANTERIOR</div>
+            <div class="prev-episode-content" @click="goToPreviousEpisode">
+              <div class="prev-episode-thumbnail">
+                <img 
+                  :src="previousEpisode.thumbnail || anime.cover_image" 
+                  :alt="previousEpisode.title"
+                />
+                <div class="play-overlay">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </div>
+              </div>
+              <div class="prev-episode-info">
+                <div class="prev-episode-title">
+                  E{{ previousEpisode.episode_number }} - {{ previousEpisode.title || `Episodio ${previousEpisode.episode_number}` }}
+                </div>
+                <div class="prev-episode-meta">
+                  {{ anime.audio_type || 'Sub' }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- View More Episodes Button -->
+          <button class="btn-all-episodes" @click="showAllEpisodes = true" v-if="episodes.length > 0">
+            VER MÁS EPISODIOS
+          </button>
+        </aside>
       </div>
     </div>
 
@@ -598,225 +720,314 @@ function goHome() {
 </template>
 
 <style scoped>
+/* ===== GLOBAL ===== */
 .watch-page {
   min-height: 100vh;
-  background: #000;
+  background: var(--bg);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== HEADER ===== */
+.watch-header {
+  background: var(--bg);
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid var(--line);
+}
+
+.watch-header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+.logo {
+  height: 35px;
+  width: auto;
+  object-fit: contain;
+}
+
+.nav-links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.nav-link {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.nav-link:hover {
   color: #fff;
 }
 
-/* Video Player */
-.player-container {
-  position: relative;
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.btn-search {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.btn-search:hover {
+  color: #fff;
+}
+
+.btn-watchlist {
+  background: transparent;
+  border: 1px solid var(--line-light);
+  color: var(--text-primary);
+  padding: 0.5rem 1.25rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-watchlist:hover {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: var(--purple-light);
+  color: var(--purple-light);
+}
+
+.user-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-profile {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--purple-light), var(--purple-dark));
+  border: 2px solid rgba(168, 85, 247, 0.3);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-profile:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+/* ===== VIDEO PLAYER ===== */
+.player-section {
   width: 100%;
-  background: #000;
+  background: var(--bg);
 }
 
 .player-wrapper {
   position: relative;
-  padding-bottom: 56.25%; /* 16:9 */
-  height: 0;
-  overflow: hidden;
-  background: #000;
+  width: 100%;
+  max-width: 1920px;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  background: var(--bg);
 }
 
+.youtube-player,
 .video-player {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: #000;
+  object-fit: contain;
+  background: var(--bg);
 }
 
-.video-loading {
+.video-loading,
+.player-error,
+.player-placeholder {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  color: #9333ea;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid rgba(147, 51, 234, 0.2);
-  border-top-color: #9333ea;
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(147, 51, 234, 0.2);
+  border-top-color: var(--purple-primary);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 1rem;
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
-.player-error {
-  padding-bottom: 56.25%;
-  background: #0a0a0a;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #ef4444;
-  gap: 1rem;
-  position: relative;
-  padding: 2rem;
-}
-
-.player-error svg {
-  opacity: 0.6;
-}
-
-.player-error .error-message {
-  max-width: 500px;
-  text-align: center;
-  margin: 0;
-  line-height: 1.6;
-  white-space: pre-line;
-  color: rgba(255, 255, 255, 0.9);
+.error-message {
+  margin: 1rem 0;
+  font-size: 0.95rem;
 }
 
 .btn-retry {
-  margin-top: 1rem;
-  padding: 0.75rem 1.5rem;
-  background: #9333ea;
-  color: white;
+  background: var(--purple-primary);
   border: none;
-  border-radius: 0.5rem;
-  font-size: 0.95rem;
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s;
 }
 
 .btn-retry:hover {
-  background: #7e22ce;
-  transform: translateY(-2px);
+  background: var(--purple-dark);
 }
 
-.player-placeholder {
-  padding-bottom: 56.25%;
-  background: #0a0a0a;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.4);
+/* ===== CONTENT SECTION ===== */
+.content-container {
+  background: var(--bg-secondary);
+  flex: 1;
 }
 
-/* Content Wrapper */
-.content-wrapper {
+.content-inner {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem 2.5rem;
+  padding: 2rem;
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 1fr 360px;
   gap: 3rem;
+  align-items: start;
 }
 
-/* Main Content */
+/* ===== MAIN CONTENT ===== */
 .main-content {
-  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.episode-header {
-  margin-bottom: 1.5rem;
+.anime-title-link a {
+  color: var(--purple-light);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
 }
 
-.black-diver {
-  margin-bottom: 0.5rem;
-}
-
-.black-diver span {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.85rem;
-  font-weight: 500;
+.anime-title-link a:hover {
+  color: var(--purple-primary);
 }
 
 .episode-title {
   font-size: 1.75rem;
   font-weight: 700;
-  margin: 0 0 0.75rem 0;
+  margin: 0;
+  line-height: 1.3;
   color: #fff;
 }
 
 .episode-meta {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.8);
-  margin-bottom: 0.5rem;
-}
-
-.episode-meta .divider {
-  color: rgba(255, 255, 255, 0.3);
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  flex-wrap: wrap;
 }
 
 .release-date {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.5);
+  margin-left: 0.5rem;
 }
 
-/* Interaction Buttons */
 .interaction-buttons {
   display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 0.75rem;
+  margin: 0.5rem 0;
 }
 
-.btn-interaction {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
-  padding: 0.65rem 1.25rem;
-  border-radius: 6px;
+.btn-like,
+.btn-dislike,
+.btn-share {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--line);
+  color: var(--text-primary);
+  padding: 0.6rem 1rem;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
   transition: all 0.2s;
-  font-size: 0.95rem;
 }
 
-.btn-interaction:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.25);
+.btn-like:hover,
+.btn-dislike:hover,
+.btn-share:hover {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: var(--purple-light);
 }
 
-.btn-interaction.active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
+.btn-like.active {
+  background: var(--purple-primary);
+  border-color: var(--purple-primary);
 }
 
-.btn-interaction svg {
-  flex-shrink: 0;
+.btn-dislike.active {
+  background: var(--purple-primary);
+  border-color: var(--purple-primary);
 }
 
-/* Description */
 .description-section {
-  margin-bottom: 2rem;
+  margin-top: 0.5rem;
 }
 
 .description-section p {
   color: rgba(255, 255, 255, 0.8);
   line-height: 1.65;
-  margin: 0 0 0.75rem 0;
+  margin: 0;
   font-size: 0.95rem;
 }
 
 .description-section p:not(.expanded) {
   display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -824,87 +1035,105 @@ function goHome() {
 .btn-show-more {
   background: none;
   border: none;
-  color: var(--color-primary-light);
+  color: var(--purple-light);
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  padding: 0;
+  padding: 0.5rem 0;
+  margin-top: 0.5rem;
   transition: color 0.2s;
 }
 
 .btn-show-more:hover {
-  color: var(--color-primary);
+  color: var(--purple-primary);
 }
 
-/* Sidebar */
+/* ===== SIDEBAR ===== */
 .sidebar {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-.next-episode-card {
-  background: rgba(20, 20, 20, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 1.25rem;
-}
-
-.next-episode-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 1rem;
-}
-
-.next-episode-thumbnail {
-  position: relative;
-  aspect-ratio: 16 / 9;
+.next-episode-card,
+.prev-episode-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--line);
   border-radius: 6px;
   overflow: hidden;
-  margin-bottom: 1rem;
-  cursor: pointer;
 }
 
-.next-episode-thumbnail img {
+.next-episode-label,
+.prev-episode-label {
+  background: var(--bg-secondary);
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--purple-light);
+  border-bottom: 1px solid var(--line);
+}
+
+.next-episode-content,
+.prev-episode-content {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.next-episode-content:hover,
+.prev-episode-content:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.next-episode-thumbnail,
+.prev-episode-thumbnail {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.next-episode-thumbnail img,
+.prev-episode-thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s;
-}
-
-.next-episode-thumbnail:hover img {
-  transform: scale(1.05);
 }
 
 .play-overlay {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.2s;
 }
 
-.next-episode-thumbnail:hover .play-overlay {
+.next-episode-content:hover .play-overlay,
+.prev-episode-content:hover .play-overlay {
   opacity: 1;
 }
 
-.next-episode-info {
-  color: #fff;
+.next-episode-info,
+.prev-episode-info {
+  padding: 1rem;
 }
 
-.next-episode-title {
-  font-size: 1rem;
+.next-episode-title,
+.prev-episode-title {
+  font-size: 0.95rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
   line-height: 1.4;
+  color: #fff;
 }
 
-.next-episode-meta {
+.next-episode-meta,
+.prev-episode-meta {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.6);
   margin-bottom: 0.25rem;
@@ -912,29 +1141,30 @@ function goHome() {
 
 .next-episode-duration {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.5);
 }
 
-.btn-view-episodes {
+.btn-all-episodes {
   width: 100%;
-  background: transparent;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  padding: 0.875rem;
+  background: rgba(147, 51, 234, 0.15);
+  border: 1px solid var(--purple-dark);
+  color: var(--purple-light);
+  padding: 0.9rem;
   border-radius: 6px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.5px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.btn-view-episodes:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.3);
+.btn-all-episodes:hover {
+  background: rgba(147, 51, 234, 0.25);
+  border-color: var(--purple-light);
+  transform: translateY(-2px);
 }
 
-/* Episodes Modal */
+/* ===== EPISODES MODAL ===== */
 .episodes-modal {
   position: fixed;
   inset: 0;
@@ -953,76 +1183,76 @@ function goHome() {
 
 .modal-content {
   position: relative;
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--line);
+  border-radius: 8px;
   width: 90%;
   max-width: 900px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
 .modal-header {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--line);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 1.5rem;
+  font-weight: 700;
 }
 
 .btn-close {
-  background: none;
+  background: transparent;
   border: none;
-  color: #fff;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   padding: 0.5rem;
-  border-radius: 6px;
-  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
 }
 
 .btn-close:hover {
-  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
 .modal-episodes-list {
   padding: 1.5rem 2rem;
   overflow-y: auto;
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 1rem;
 }
 
 .episode-item {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 1rem;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .episode-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  border-color: var(--line-light);
 }
 
 .episode-item.active {
-  background: rgba(147, 51, 234, 0.15);
-  border-color: var(--color-primary);
+  border: 2px solid var(--purple-primary);
 }
 
 .episode-item-thumbnail {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -1039,34 +1269,36 @@ function goHome() {
   background: rgba(0, 0, 0, 0.8);
   color: #fff;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  border-radius: 3px;
+  font-size: 0.75 rem;
+  font-weight: 700;
 }
 
 .episode-item-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  padding: 0.75rem;
 }
 
 .episode-item-title {
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .episode-item-meta {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
 }
 
-/* Footer */
+/* ===== FOOTER ===== */
 .footer {
-  background: #0a0a0a;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 3rem 2.5rem 2rem;
-  margin-top: 4rem;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--line);
+  padding: 3rem 2rem 2rem;
+  margin-top: auto;
 }
 
 .footer-content {
@@ -1080,22 +1312,21 @@ function goHome() {
 
 .footer-logo {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  align-items: flex-start;
   cursor: pointer;
 }
 
 .footer-logo .logo-image {
-  height: 50px;
+  height: 45px;
   width: auto;
   object-fit: contain;
 }
 
 .footer-section h3 {
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 1rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: #fff;
 }
 
 .footer-section ul {
@@ -1113,66 +1344,49 @@ function goHome() {
 }
 
 .footer-section li:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: #fff;
 }
 
 .footer-bottom {
   max-width: 1400px;
   margin: 0 auto;
   padding-top: 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--line);
 }
 
 .language-selector {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
-  padding: 0.65rem 1.25rem;
-  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--line-light);
+  color: var(--text-secondary);
+  padding: 0.7rem 1.25rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .language-selector:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--purple-light);
+  color: var(--text-primary);
 }
 
-/* Responsive */
+/* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
-  .content-wrapper {
+  .content-inner {
     grid-template-columns: 1fr;
     gap: 2rem;
   }
 
   .sidebar {
-    order: -1;
+    grid-row: 1;
   }
 
-  .footer-content {
-    grid-template-columns: repeat(2, 1fr);
+  .main-content {
+    grid-row: 2;
   }
 }
 
-@media (max-width: 768px) {
-  .content-wrapper {
-    padding: 1.5rem;
-  }
-
-  .episode-title {
-    font-size: 1.25rem;
-  }
-
-  .interaction-buttons {
-    flex-wrap: wrap;
-  }
-
-  .footer-content {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

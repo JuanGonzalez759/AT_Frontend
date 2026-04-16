@@ -97,30 +97,33 @@ function getAnimeProgress(animeId) {
 
 async function loadAnimes() {
   try {
-    const response = await fetch('/api/backoffice/public/animes/', {
+    const response = await fetch('/api/backoffice/public/animes/?page_size=100', {
       credentials: 'include'
     })
     if (response.ok) {
       const data = await response.json()
       const animes = data.results || data
       
-      // Hero carousel - Top 5 animes con estado de visualización REAL del backend
-      featuredAnimes.value = animes.slice(0, 5).map((anime) => {
-        const progress = getAnimeProgress(anime.id)
-        
-        return {
-          id: anime.id,
-          title: anime.title,
-          year: anime.year,
-          genre: anime.genre,
-          description: anime.description,
-          background: anime.background_image || anime.cover_image,
-          rating: anime.rating,
-          watched: progress.watched,
-          currentEpisode: progress.current_episode,
-          totalEpisodes: anime.episode_count || progress.total_episodes || 24
-        }
-      })
+      // Hero carousel - Top 5 animes mejor puntuados con estado de visualización REAL
+      featuredAnimes.value = [...animes]
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .slice(0, 5)
+        .map((anime) => {
+          const progress = getAnimeProgress(anime.id)
+          
+          return {
+            id: anime.id,
+            title: anime.title,
+            year: anime.year,
+            genre: anime.genre,
+            description: anime.description,
+            background: anime.background_image || anime.cover_image,
+            rating: anime.rating,
+            watched: progress.watched,
+            currentEpisode: progress.current_episode,
+            totalEpisodes: anime.episode_count || progress.total_episodes || 24
+          }
+        })
       
       // Transformar datos para cada sección
       const transformAnime = (anime) => ({
@@ -137,8 +140,11 @@ async function loadAnimes() {
         progress: 0 // Esto vendría del backend cuando implementes el tracking
       })
       
-      // Popular Now - todos los animes
-      popularNow.value = animes.map(transformAnime)
+      // Popular Now - animes con mejor puntuación
+      popularNow.value = [...animes]
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .slice(0, 15)
+        .map(transformAnime)
       
       // New This Season - animes recientes (por fecha)
       newThisSeason.value = [...animes]
@@ -146,24 +152,28 @@ async function loadAnimes() {
         .slice(0, 10)
         .map(transformAnime)
       
-      // Simulcasts - solo animes con is_simulcast=true
+      // Simulcasts - solo animes con is_simulcast=true (ordenados por rating)
       simulcasts.value = animes
         .filter(anime => anime.is_simulcast)
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
         .map(transformAnime)
       
-      // Por género
+      // Por género (ordenados por rating)
       actionAnimes.value = animes
         .filter(anime => anime.genre?.toLowerCase().includes('action') || 
                          anime.genre?.toLowerCase().includes('acción'))
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
         .map(transformAnime)
       
       romanceAnimes.value = animes
         .filter(anime => anime.genre?.toLowerCase().includes('romance'))
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
         .map(transformAnime)
       
       comedyAnimes.value = animes
         .filter(anime => anime.genre?.toLowerCase().includes('comedy') || 
                          anime.genre?.toLowerCase().includes('comedia'))
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
         .map(transformAnime)
       
       // Continue Watching - REAL data from user progress (episodios en progreso)
@@ -240,7 +250,7 @@ onMounted(async () => {
         <div class="header-left">
           <img src="/Logo_AniToki.png" alt="AniToki" class="logo" />
           <nav class="nav-links">
-            <a href="#popular" class="nav-link">Explorar</a>
+            <a @click="router.push('/categories')" class="nav-link" style="cursor: pointer;">Explorar</a>
             <a href="#manga" class="nav-link">Manga</a>
             <a href="#noticias" class="nav-link">Noticias</a>
           </nav>

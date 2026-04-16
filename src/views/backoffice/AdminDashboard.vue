@@ -26,7 +26,7 @@ onActivated(() => {
 
 async function loadAnimes() {
   try {
-    const response = await fetch('/api/backoffice/animes/', {
+    const response = await fetch('/api/backoffice/animes/?page_size=100', {
       credentials: 'include'
     })
     if (response.ok) {

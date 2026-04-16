@@ -3,6 +3,7 @@ import { useAuth } from '../composables/useAuth'
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 import Home from '../views/Home.vue'
+import Categories from '../views/Categories.vue'
 import ChooseProfile from '../views/manager/ChooseProfile.vue'
 import AdminDashboard from '../views/backoffice/AdminDashboard.vue'
 import AddAnime from '../views/backoffice/AddAnime.vue'
@@ -67,6 +68,12 @@ const routes = [
     path: '/home',
     name: 'Home',
     component: Home,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/categories',
+    name: 'Categories',
+    component: Categories,
     meta: { requiresAuth: true },
   },
 ]
