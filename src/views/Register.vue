@@ -392,4 +392,36 @@ a {
   color: #812e96;
   text-decoration: none;
 }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .min-h-screen {
+    padding: 1rem;
+  }
+
+  .absolute {
+    top: 1rem !important;
+    left: 1rem !important;
+  }
+
+  .absolute img {
+    height: 2rem;
+  }
+
+  .w-full.max-w-sm {
+    max-width: 100%;
+  }
+
+  .card {
+    padding: 1.5rem;
+  }
+
+  .text-2xl {
+    font-size: 1.5rem;
+  }
+
+  .text-xs {
+    font-size: 0.75rem;
+  }
+}
 </style>

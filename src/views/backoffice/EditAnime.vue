@@ -463,13 +463,52 @@ function cancel() {
   cursor: not-allowed;
 }
 
+@media (max-width: 1024px) {
+  .edit-anime-container {
+    padding: 1.5rem;
+  }
+}
+
 @media (max-width: 768px) {
+  .edit-anime-container {
+    padding: 1rem;
+  }
+
+  .anime-title {
+    font-size: 1.5rem;
+  }
+
   .form-row {
     grid-template-columns: 1fr;
   }
 
   .form-actions {
     flex-direction: column;
+  }
+
+  .btn-save,
+  .btn-cancel {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .edit-anime-container {
+    padding: 0.75rem;
+  }
+
+  .anime-title {
+    font-size: 1.25rem;
+  }
+
+  .form-group label {
+    font-size: 0.875rem;
+  }
+
+  .btn-save,
+  .btn-cancel {
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
   }
 }
 </style>

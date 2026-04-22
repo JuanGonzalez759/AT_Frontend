@@ -8,6 +8,13 @@ import ContinueWatchingCard from '../components/ContinueWatchingCard.vue'
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
 
+// Mobile menu
+const mobileMenuOpen = ref(false)
+
+function toggleMobileMenu() {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
 // Hero carousel data
 const featuredAnimes = ref([])
 const currentSlide = ref(0)
@@ -256,6 +263,14 @@ onMounted(async () => {
           </nav>
         </div>
         <div class="header-right">
+          <!-- Hamburger menu button (mobile) -->
+          <button class="btn-hamburger" @click="toggleMobileMenu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <button class="btn-search">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"></circle>
@@ -305,6 +320,33 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
+      <!-- Mobile Navigation Menu -->
+      <div class="mobile-menu" :class="{ open: mobileMenuOpen }">
+        <div class="mobile-menu-header">
+          <img src="/Logo_AniToki.png" alt="AniToki" class="logo" />
+          <button class="btn-close" @click="toggleMobileMenu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <nav class="mobile-nav-links">
+          <a @click="router.push('/categories'); toggleMobileMenu()" class="mobile-nav-link">Explorar</a>
+          <a href="#manga" class="mobile-nav-link" @click="toggleMobileMenu">Manga</a>
+          <a href="#noticias" class="mobile-nav-link" @click="toggleMobileMenu">Noticias</a>
+          <a href="#" class="mobile-nav-link" @click="toggleMobileMenu">Mi Lista</a>
+          <a v-if="currentUser?.username === 'admin'" @click="router.push('/backoffice'); toggleMobileMenu()" class="mobile-nav-link">Gestión</a>
+          <a @click="goToTestWatch(); toggleMobileMenu()" class="mobile-nav-link">Reproductor</a>
+        </nav>
+        <div class="mobile-menu-footer">
+          <button v-if="currentUser" @click="handleLogout; toggleMobileMenu()" class="btn-logout-mobile">
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+      <div v-if="mobileMenuOpen" class="mobile-menu-overlay" @click="toggleMobileMenu"></div>
     </header>
 
     <!-- Hero Banner Carousel -->
@@ -1182,26 +1224,192 @@ onMounted(async () => {
   color: var(--color-primary-light);
 }
 
+/* Mobile Navigation Menu */
+.btn-hamburger {
+  display: none;
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  right: -300px;
+  width: 280px;
+  height: 100vh;
+  background: rgba(10, 10, 10, 0.98);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  transition: right 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobile-menu.open {
+  right: 0;
+}
+
+.mobile-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobile-menu-header .logo {
+  height: 32px;
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+.mobile-nav-links {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0;
+}
+
+.mobile-nav-link {
+  padding: 1rem 1.5rem;
+  color: white;
+  text-decoration: none;
+  font-size: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.mobile-nav-link:hover {
+  background: rgba(147, 51, 234, 0.1);
+}
+
+.mobile-menu-footer {
+  padding: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-logout-mobile {
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: #fca5a5;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-logout-mobile:hover {
+  background: rgba(220, 38, 38, 0.2);
+}
+
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
 /* Responsive */
+@media (max-width: 1024px) {
+  .btn-test-watch,
+  .btn-admin {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
+  .btn-hamburger {
+    display: block;
+  }
+
   .header-content {
-    padding: 1rem 1.5rem;
+    padding: 1rem 1rem;
   }
   
   .nav-links {
     display: none;
   }
+
+  .header-right .btn-search,
+  .header-right .btn-watchlist,
+  .header-right .user-controls {
+    display: none;
+  }
   
   .hero-title {
-    font-size: 2.5rem;
+    font-size: 1.75rem;
+  }
+
+  .hero-description {
+    font-size: 0.875rem;
+    max-height: 3.5rem;
+    overflow: hidden;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .btn-hero-play,
+  .btn-hero-info {
+    width: 100%;
+    justify-content: center;
   }
   
   .main-content {
-    padding: 2rem 1.5rem;
+    padding: 1.5rem 1rem;
+  }
+
+  .section-header {
+    font-size: 1.25rem;
   }
   
   .carousel-track > * {
-    flex: 0 0 150px;
+    flex: 0 0 140px;
+    min-width: 140px;
+    max-width: 140px;
+  }
+
+  .carousel-controls {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 1.5rem;
+  }
+
+  .hero-meta {
+    font-size: 0.75rem;
+  }
+
+  .carousel-track > * {
+    flex: 0 0 120px;
+    min-width: 120px;
+    max-width: 120px;
+  }
+
+  .main-content {
+    padding: 1rem 0.75rem;
   }
 }
 </style>

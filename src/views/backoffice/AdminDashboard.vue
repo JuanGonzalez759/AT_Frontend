@@ -688,18 +688,74 @@ function getCookie(name) {
   box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
 }
 
+@media (max-width: 1024px) {
+  .anime-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
+  .admin-container {
+    padding: 1rem;
+  }
+
   .admin-header {
     flex-direction: column;
     gap: 1rem;
   }
 
+  .admin-title {
+    font-size: 1.5rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .anime-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+
+  .modal-content {
+    padding: 1.5rem;
+    margin: 1rem;
   }
 
   .modal-actions {
     flex-direction: column-reverse;
+  }
+
+  .btn-modal-delete,
+  .btn-modal-cancel {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-container {
+    padding: 0.75rem;
+  }
+
+  .admin-title {
+    font-size: 1.25rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .anime-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .anime-card h3 {
+    font-size: 0.875rem;
+  }
+
+  .modal-content {
+    padding: 1rem;
+    margin: 0.5rem;
   }
 }
 </style>

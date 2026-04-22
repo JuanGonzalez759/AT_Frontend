@@ -1322,9 +1322,23 @@ async function saveEdit() {
   box-shadow: 0 6px 16px rgba(168, 85, 247, 0.4);
 }
 
+@media (max-width: 1024px) {
+  .manage-episodes-container {
+    padding: 1.5rem;
+  }
+
+  .episodes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
+  .manage-episodes-container {
+    padding: 1rem;
+  }
+
   .anime-title {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
   }
   
   .form-row {
@@ -1337,6 +1351,43 @@ async function saveEdit() {
 
   .modal-actions {
     flex-direction: column;
+  }
+
+  .btn-modal-save,
+  .btn-modal-cancel {
+    width: 100%;
+  }
+
+  .episode-actions {
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .manage-episodes-container {
+    padding: 0.75rem;
+  }
+
+  .anime-title {
+    font-size: 1.25rem;
+  }
+
+  .episode-card {
+    padding: 0.75rem;
+  }
+
+  .episode-number {
+    font-size: 0.875rem;
+  }
+
+  .form-group label {
+    font-size: 0.875rem;
+  }
+
+  .btn-add-episode,
+  .btn-bulk-add {
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
   }
 }
 </style>

@@ -35,6 +35,42 @@ const saved = ref(false)
 const likeCount = ref(23)
 const dislikeCount = ref(8)
 
+// Fullscreen orientation control
+function setupFullscreenOrientation() {
+  if (!videoPlayer.value) return
+
+  const handleFullscreenChange = async () => {
+    const isFullscreen = document.fullscreenElement === videoPlayer.value
+
+    if (isFullscreen) {
+      // Entró en pantalla completa - forzar landscape en móviles
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape')
+          console.log('✔ Orientación bloqueada en landscape')
+        }
+      } catch (error) {
+        console.warn('No se pudo bloquear la orientación:', error)
+      }
+    } else {
+      // Salió de pantalla completa - desbloquear orientación
+      try {
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock()
+          console.log('✔ Orientación desbloqueada')
+        }
+      } catch (error) {
+        console.warn('No se pudo desbloquear la orientación:', error)
+      }
+    }
+  }
+
+  videoPlayer.value.addEventListener('fullscreenchange', handleFullscreenChange)
+  videoPlayer.value.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+  videoPlayer.value.addEventListener('mozfullscreenchange', handleFullscreenChange)
+  videoPlayer.value.addEventListener('msfullscreenchange', handleFullscreenChange)
+}
+
 async function handleLogout() {
   try {
     await logout()
@@ -57,9 +93,21 @@ onMounted(async () => {
   // Esperar a que el DOM esté completamente renderizado
   await nextTick()
   await loadEpisodeSources()
+  
+  // Configurar control de orientación en fullscreen
+  setupFullscreenOrientation()
 })
 
 onBeforeUnmount(() => {
+  // Desbloquear orientación si está bloqueada
+  try {
+    if (screen.orientation && screen.orientation.unlock) {
+      screen.orientation.unlock()
+    }
+  } catch (error) {
+    // Silenciar error si ya está desbloqueada
+  }
+
   // Limpiar HLS.js
   if (hls.value) {
     hls.value.destroy()
@@ -1374,6 +1422,12 @@ function goHome() {
 }
 
 /* ===== RESPONSIVE ===== */
+@media (max-width: 1200px) {
+  .player-wrapper {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 1024px) {
   .content-inner {
     grid-template-columns: 1fr;
@@ -1386,6 +1440,106 @@ function goHome() {
 
   .main-content {
     grid-row: 2;
+  }
+
+  .nav-bar {
+    padding: 1rem 1.5rem;
+  }
+
+  .anime-info h1 {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav-bar {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+  }
+
+  .logo {
+    height: 32px;
+  }
+
+  .nav-center {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .episode-nav-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .anime-info {
+    padding: 1rem;
+  }
+
+  .anime-info h1 {
+    font-size: 1.25rem;
+  }
+
+  .anime-meta {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .meta-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .anime-description {
+    font-size: 0.875rem;
+  }
+
+  .episodes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .episode-card {
+    padding: 0.5rem;
+  }
+
+  .episode-number {
+    font-size: 0.875rem;
+  }
+
+  .episode-title {
+    font-size: 0.75rem;
+  }
+
+  .language-selector {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-bar {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .logo {
+    height: 28px;
+  }
+
+  .episode-nav-btn {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .anime-info h1 {
+    font-size: 1.1rem;
+  }
+
+  .episodes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .content-inner {
+    gap: 1rem;
   }
 }
 

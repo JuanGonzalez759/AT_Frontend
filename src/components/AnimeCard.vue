@@ -97,8 +97,27 @@ function handleClick() {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
   width: 100%;
-  min-width: 160px;
-  max-width: 220px;
+}
+
+@media (min-width: 1024px) {
+  .anime-card {
+    min-width: 160px;
+    max-width: 220px;
+  }
+}
+
+@media (max-width: 1023px) and (min-width: 768px) {
+  .anime-card {
+    min-width: 140px;
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 767px) {
+  .anime-card {
+    min-width: 120px;
+    max-width: 140px;
+  }
 }
 
 .anime-card:hover {

@@ -863,13 +863,32 @@ function cancel() {
   box-shadow: 0 6px 16px rgba(168, 85, 247, 0.4);
 }
 
+@media (max-width: 1024px) {
+  .add-anime-container {
+    padding: 1.5rem;
+  }
+}
+
 @media (max-width: 768px) {
+  .add-anime-container {
+    padding: 1rem;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
   .form-row {
     grid-template-columns: 1fr;
   }
 
   .form-actions {
     flex-direction: column;
+  }
+
+  .btn-primary,
+  .btn-cancel {
+    width: 100%;
   }
   
   .result-card {
@@ -879,6 +898,31 @@ function cancel() {
   .result-image {
     width: 100%;
     height: auto;
+  }
+
+  .search-results {
+    max-height: 400px;
+  }
+}
+
+@media (max-width: 480px) {
+  .add-anime-container {
+    padding: 0.75rem;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .form-group label {
+    font-size: 0.875rem;
+  }
+
+  .btn-search,
+  .btn-primary,
+  .btn-cancel {
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
   }
 }
 </style>
