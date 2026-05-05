@@ -7,6 +7,7 @@ import AnimeCard from '../components/AnimeCard.vue'
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser } = useAuth()
 
+const dropdownOpen = ref(false)
 const selectedCategory = ref('all')
 const allAnimes = ref([])
 const isLoading = ref(true)
@@ -150,6 +151,7 @@ onMounted(async () => {
             </svg>
           </button>
           
+
           <button 
             v-if="currentUser?.username === 'admin'" 
             @click="router.push('/backoffice')" 
@@ -190,21 +192,31 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- Categories Grid -->
+    <!-- Categories Dropdown -->
     <section class="categories-section">
-      <div class="categories-grid">
-        <button
-          v-for="category in categories"
-          :key="category.id"
-          class="category-card"
-          :class="{ active: selectedCategory === category.id }"
-          @click="selectedCategory = category.id"
-        >
-          <span class="category-name">{{ category.name }}</span>
-          <div class="category-gradient" :class="`bg-gradient-to-br ${category.gradient}`"></div>
+      <div class="dropdown-static">
+        <button class="dropdown-toggle" @click="dropdownOpen = !dropdownOpen">
+          <span class="dropdown-label">GÉNEROS</span>
+          <svg class="dropdown-arrow" width="16" height="16" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2" fill="none"/></svg>
         </button>
+        <transition name="fade-slide">
+          <div v-if="dropdownOpen" class="dropdown-menu-horizontal-static">
+            <div class="categories-horizontal">
+              <button
+                v-for="category in categories"
+                :key="category.id"
+                class="category-horizontal-btn"
+                :class="{ active: selectedCategory === category.id }"
+                @click.stop="selectedCategory = category.id; dropdownOpen = false"
+              >
+                {{ category.name }}
+              </button>
+            </div>
+          </div>
+        </transition>
       </div>
     </section>
+  
 
     <!-- Filters Bar -->
     <section class="filters-section">
@@ -255,6 +267,90 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* Dropdown horizontal personalizado */
+/* Dropdown alineado a la izquierda */
+.dropdown {
+  position: relative;
+  display: block;
+  margin: 2rem 0;
+}
+.dropdown-toggle {
+  background: #18181c;
+  color: #fff;
+  border: 1px solid #333;
+  padding: 0.75rem 2.5rem 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  min-width: 180px;
+  justify-content: space-between;
+}
+/* Dropdown estático que empuja el contenido */
+.dropdown-static {
+  position: relative;
+  display: block;
+  margin: 2rem 0;
+}
+.dropdown-menu-horizontal-static {
+  position: static;
+  background: #23232b;
+  border: 1px solid #333;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  min-width: 300px;
+  padding: 1rem 1rem;
+  margin-top: 0.5rem;
+}
+/* Animación para el despliegue */
+.fade-slide-enter-active, .fade-slide-leave-active {
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.fade-slide-enter-from, .fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+.fade-slide-enter-to, .fade-slide-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes desplegar-derecha {
+  0% {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Categorías barra horizontal */
+.categories-horizontal {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 2rem 0 2rem 0;
+  flex-wrap: wrap;
+}
+.category-horizontal-btn {
+  background: #18181c;
+  color: #fff;
+  border: 1px solid #333;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border 0.2s;
+}
+.category-horizontal-btn.active,
+.category-horizontal-btn:hover {
+  background: #33334d;
+  color: #fff;
+  border-color: #7c3aed;
+}
 .categories-container {
   min-height: 100vh;
   background: linear-gradient(to bottom, #0a0a0a, #1a1a1a);
