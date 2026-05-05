@@ -144,7 +144,9 @@ async function loadAnimes() {
         ageRating: anime.age_rating,
         isSimulcast: anime.is_simulcast,
         rating: anime.rating,
-        progress: 0 // Esto vendría del backend cuando implementes el tracking
+        progress: 0, // Esto vendría del backend cuando implementes el tracking
+        isDemoContent: anime.id !== 6, // One Piece (ID 6) es el único licenciado
+        contentType: anime.content_type || 'SERIE'
       })
       
       // Popular Now - animes con mejor puntuación

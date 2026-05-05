@@ -101,7 +101,9 @@ async function loadAnimes() {
         isSimulcast: anime.is_simulcast,
         rating: anime.rating,
         created_at: anime.created_at,
-        progress: 0
+        progress: 0,
+        isDemoContent: anime.id !== 6, // One Piece (ID 6) es el único licenciado
+        contentType: anime.content_type || 'SERIE'
       }))
     }
   } catch (error) {

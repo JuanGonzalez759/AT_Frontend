@@ -22,7 +22,15 @@ const props = defineProps({
   },
   ageRating: String,
   isSimulcast: Boolean,
-  rating: Number
+  rating: Number,
+  isDemoContent: {
+    type: Boolean,
+    default: true
+  },
+  contentType: {
+    type: String,
+    default: 'SERIE'
+  }
 })
 
 const router = useRouter()
@@ -53,9 +61,28 @@ function handleClick() {
       
       <!-- Badges superiores -->
       <div class="badges-top">
-        <span v-if="isSimulcast" class="badge badge-simulcast">SIMULCAST</span>
-        <span v-if="audioType" class="badge badge-audio">{{ audioType }}</span>
+        <!-- Tipo de contenido con icono -->
+        <span v-if="contentType === 'PELÍCULA'" class="badge badge-type" title="Película">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/>
+          </svg>
+        </span>
+        
+        <!-- Licencia / Demo más sutil -->
+        <span v-if="!isDemoContent" class="badge badge-licensed-icon" title="Contenido Licenciado">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+          </svg>
+        </span>
+        
+        <!-- Audio solo si es especial -->
+        <span v-if="!isDemoContent && audioType && audioType !== 'SUB'" class="badge badge-audio-compact">
+          {{ audioType }}
+        </span>
       </div>
+      
+      <!-- Badge demo en esquina inferior si es contenido demo -->
+      <div v-if="isDemoContent" class="demo-watermark">DEMO</div>
       
       <!-- Overlay con información al hover -->
       <div class="card-overlay" :class="{ visible: isHovered }">
@@ -77,9 +104,6 @@ function handleClick() {
           </div>
         </div>
       </div>
-      
-      <!-- Badge de rating en la esquina -->
-      <div v-if="ageRating" class="age-rating">{{ ageRating }}</div>
     </div>
     
     <!-- Información debajo de la imagen -->
@@ -186,6 +210,59 @@ function handleClick() {
   letter-spacing: 0.5px;
   text-transform: uppercase;
   backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-type {
+  background: rgba(59, 130, 246, 0.95);
+  color: #fff;
+  padding: 5px 6px;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge-licensed-icon {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  padding: 5px 6px;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  animation: pulse-licensed 2s ease-in-out infinite;
+}
+
+.badge-audio-compact {
+  background: rgba(0, 0, 0, 0.9);
+  color: #fff;
+  border: 1px solid rgba(16, 185, 129, 0.6);
+  padding: 3px 6px;
+  font-size: 9px;
+}
+
+.demo-watermark {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  color: rgba(251, 191, 36, 0.9);
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  z-index: 2;
 }
 
 .badge-simulcast {
@@ -197,6 +274,34 @@ function handleClick() {
   background: rgba(0, 0, 0, 0.8);
   color: #fff;
   border: 1px solid rgba(147, 51, 234, 0.5);
+}
+
+.badge-licensed {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  animation: pulse-licensed 2s ease-in-out infinite;
+}
+
+.badge-demo {
+  background: rgba(251, 191, 36, 0.9);
+  color: #000;
+  border: 1px solid rgba(245, 158, 11, 0.8);
+}
+
+.badge-content-type {
+  background: rgba(59, 130, 246, 0.9);
+  color: #fff;
+  border: 1px solid rgba(37, 99, 235, 0.8);
+}
+
+@keyframes pulse-licensed {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: 0 2px 12px rgba(16, 185, 129, 0.6);
+  }
 }
 
 /* Age rating badge */
