@@ -380,28 +380,24 @@ function cancel() {
 }
 
 .form-header {
-  background: rgba(10, 10, 10, 0.95);
-  padding: 1rem 2rem;
+  background: rgba(20, 20, 20, 0.95);
+  padding: 2rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  backdrop-filter: blur(10px);
 }
 
 .form-title {
-  font-size: 1.5rem;
+  font-size: 2rem;
   font-weight: 700;
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 0.5rem 0;
   color: #fff;
 }
 
 .form-subtitle {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.5);
   margin: 0;
 }
 
@@ -409,10 +405,9 @@ function cancel() {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #fff;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
   font-size: 0.9rem;
-  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -422,7 +417,7 @@ function cancel() {
 
 .btn-back:hover {
   background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(168, 85, 247, 0.5);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .form-content {

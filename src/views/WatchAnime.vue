@@ -2,13 +2,11 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
-import { useProfile } from '../composables/useProfile'
 import Hls from 'hls.js'
 
 const router = useRouter()
 const route = useRoute()
 const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
-const { currentProfile, loadProfile } = useProfile()
 
 const animeId = ref(route.query.anime)
 const episodeNumber = ref(parseInt(route.query.episode) || 1)
@@ -34,8 +32,8 @@ const youtubeEmbedUrl = ref('')
 const liked = ref(false)
 const disliked = ref(false)
 const saved = ref(false)
-const likeCount = ref(23)
-const dislikeCount = ref(8)
+const likeCount = ref(0)
+const dislikeCount = ref(0) // Si quieres dislikes persistentes, deberás hacer lo mismo que con likes
 
 // Fullscreen orientation control
 function setupFullscreenOrientation() {
@@ -87,7 +85,6 @@ onMounted(async () => {
     return
   }
   
-  await loadProfile()
   await loadAnime()
   await loadEpisodeData()
   
@@ -132,6 +129,8 @@ async function loadAnime() {
     })
     if (response.ok) {
       anime.value = await response.json()
+      likeCount.value = anime.value.likes || 0
+      dislikeCount.value = anime.value.dislikes || 0
     }
   } catch (error) {
     console.error('Error loading anime:', error)
@@ -472,13 +471,31 @@ function toggleLike() {
   if (liked.value) {
     liked.value = false
     likeCount.value--
+    updateLikesBackend(likeCount.value)
   } else {
     liked.value = true
     likeCount.value++
+    updateLikesBackend(likeCount.value)
     if (disliked.value) {
       disliked.value = false
       dislikeCount.value--
+      updateDislikesBackend(dislikeCount.value)
     }
+  }
+}
+
+async function updateLikesBackend(newLikes) {
+  try {
+    await fetch(`/api/backoffice/public/animes/${animeId.value}/likes/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ likes: newLikes })
+    })
+  } catch (error) {
+    console.error('Error actualizando likes:', error)
   }
 }
 
@@ -486,14 +503,31 @@ function toggleDislike() {
   if (disliked.value) {
     disliked.value = false
     dislikeCount.value--
+    updateDislikesBackend(dislikeCount.value)
   } else {
     disliked.value = true
     dislikeCount.value++
+    updateDislikesBackend(dislikeCount.value)
     if (liked.value) {
       liked.value = false
       likeCount.value--
+      updateLikesBackend(likeCount.value)
     }
   }
+async function updateDislikesBackend(newDislikes) {
+  try {
+    await fetch(`/api/backoffice/public/animes/${animeId.value}/dislikes/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ dislikes: newDislikes })
+    })
+  } catch (error) {
+    console.error('Error actualizando dislikes:', error)
+  }
+}
 }
 
 function toggleSave() {
@@ -531,11 +565,10 @@ function goHome() {
               <path d="m21 21-4.35-4.35"></path>
             </svg>
           </button>
-          <button class="btn-watchlist" @click="router.push('/my-list')">Mi Lista</button>
+          <button class="btn-watchlist" @click="router.push('/home')">Mi Lista</button>
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <img v-if="currentProfile" :src="currentProfile.avatar" alt="Profile" class="profile-avatar" />
-              <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
           </div>
         </div>
@@ -817,13 +850,12 @@ function goHome() {
 
 /* ===== HEADER ===== */
 .watch-header {
-  background: rgba(10, 10, 10, 0.95);
+  background: var(--bg);
   padding: 1rem 0;
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--line);
 }
 
 .watch-header-content {
@@ -838,11 +870,11 @@ function goHome() {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 2.5rem;
 }
 
 .logo {
-  height: 50px;
+  height: 35px;
   width: auto;
   object-fit: contain;
 }
@@ -855,76 +887,53 @@ function goHome() {
 .nav-link {
   color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
-  font-weight: 600;
   font-size: 0.95rem;
-  transition: color 0.3s;
+  font-weight: 500;
   cursor: pointer;
-  position: relative;
-  padding: 0.5rem 0;
+  transition: color 0.2s;
 }
 
 .nav-link:hover {
   color: #fff;
 }
 
-.nav-link.active {
-  color: #a855f7;
-}
-
-.nav-link.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, #a855f7, #9333ea);
-}
-
 .header-right {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .btn-search {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
-  padding: 0.6rem;
-  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  transition: all 0.3s;
+  padding: 0.5rem;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
+  transition: color 0.2s;
 }
 
 .btn-search:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(168, 85, 247, 0.5);
+  color: #fff;
 }
 
 .btn-watchlist {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--line-light);
+  color: var(--text-primary);
+  padding: 0.5rem 1.25rem;
+  border-radius: 4px;
   font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .btn-watchlist:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(168, 85, 247, 0.15);
+  border-color: var(--purple-light);
+  color: var(--purple-light);
 }
 
 .user-controls {
@@ -934,33 +943,24 @@ function goHome() {
 }
 
 .btn-profile {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #a855f7, #9333ea);
+  background: linear-gradient(135deg, var(--purple-light), var(--purple-dark));
   border: 2px solid rgba(168, 85, 247, 0.3);
   color: #fff;
+  font-size: 1.1rem;
   font-weight: 700;
-  font-size: 1rem;
   cursor: pointer;
-  transition: all 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  padding: 0;
-}
-
-.btn-profile .profile-avatar {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
+  transition: all 0.2s;
 }
 
 .btn-profile:hover {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.5);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
 }
 
 /* ===== VIDEO PLAYER ===== */
