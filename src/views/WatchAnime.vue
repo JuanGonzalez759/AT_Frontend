@@ -49,20 +49,18 @@ function setupFullscreenOrientation() {
       try {
         if (screen.orientation && screen.orientation.lock) {
           await screen.orientation.lock('landscape')
-          console.log('✔ Orientación bloqueada en landscape')
         }
       } catch (error) {
-        console.warn('No se pudo bloquear la orientación:', error)
+        // Silenciar error de orientación
       }
     } else {
       // Salió de pantalla completa - desbloquear orientación
       try {
         if (screen.orientation && screen.orientation.unlock) {
           screen.orientation.unlock()
-          console.log('✔ Orientación desbloqueada')
         }
       } catch (error) {
-        console.warn('No se pudo desbloquear la orientación:', error)
+        // Silenciar error de orientación
       }
     }
   }
@@ -185,7 +183,6 @@ async function loadEpisodeSources() {
       
       // Detectar si es un video de YouTube
       if (videoUrl.includes('youtube.com/embed') || videoUrl.includes('youtu.be') || videoUrl.includes('youtube.com/watch')) {
-        console.log('✔ Video de YouTube detectado')
         isYouTubeVideo.value = true
         
         let videoId = ''
@@ -217,11 +214,22 @@ async function loadEpisodeSources() {
       
       // Si no es YouTube, verificar si es M3U8 y cargar con HLS
       if (videoUrl.includes('.m3u8')) {
-        console.log('✔ Video M3U8 detectado')
         await setupHlsPlayer(videoUrl, {})
         isLoadingVideo.value = false
         return
       }
+      
+      // Si es MP4 u otro formato, usar reproductor HTML5 nativo
+      if (videoUrl.includes('.mp4') || videoUrl.includes('.webm') || videoUrl.includes('.ogg')) {
+        await setupNativePlayer(videoUrl)
+        isLoadingVideo.value = false
+        return
+      }
+      
+      // Si no coincide con ningún formato conocido, intentar como video nativo
+      await setupNativePlayer(videoUrl)
+      isLoadingVideo.value = false
+      return
     }
     
     // Si no hay video_url directo, usar Consumet API (flujo original)
@@ -240,8 +248,7 @@ async function loadEpisodeSources() {
     
     // Verificar si es un video de respaldo (fallback)
     if (data.fallback) {
-      console.warn('⚠️ Usando video de demostración:', data.message)
-      console.warn('Errores de APIs:', data.errors)
+
       // No mostrar error, solo log - el video se cargará normalmente
     }
     
@@ -267,6 +274,36 @@ async function loadEpisodeSources() {
   }
 }
 
+async function setupNativePlayer(videoUrl) {
+  // Limpiar HLS si existe
+  if (hls.value) {
+    hls.value.destroy()
+    hls.value = null
+  }
+  
+  // Esperar a que el elemento esté disponible
+  if (!videoPlayer.value) {
+    await nextTick()
+    
+    if (!videoPlayer.value) {
+      videoError.value = 'Error: El reproductor de video no está disponible'
+      return
+    }
+  }
+  
+  // Configurar reproductor nativo HTML5
+  videoPlayer.value.src = videoUrl
+  
+  // Intentar autoplay con mute
+  videoPlayer.value.muted = true
+  videoPlayer.value.play().then(() => {
+    // Unmute después de que comience
+    videoPlayer.value.muted = false
+  }).catch(() => {
+    videoPlayer.value.muted = false
+  })
+}
+
 async function setupHlsPlayer(videoUrl, headers = {}) {
   // Limpiar player anterior si existe
   if (hls.value) {
@@ -276,11 +313,9 @@ async function setupHlsPlayer(videoUrl, headers = {}) {
   
   // Esperar a que el elemento esté disponible (con reintentos)
   if (!videoPlayer.value) {
-    console.warn('Video player not ready, waiting...')
     await nextTick()
     
     if (!videoPlayer.value) {
-      console.error('Video player element not found after waiting')
       videoError.value = 'Error: El reproductor de video no está disponible'
       return
     }
@@ -298,14 +333,12 @@ async function setupHlsPlayer(videoUrl, headers = {}) {
     hls.value.attachMedia(videoPlayer.value)
     
     hls.value.on(Hls.Events.MANIFEST_PARSED, () => {
-      console.log('✔ Video cargado correctamente')
       // Mutear temporalmente para permitir autoplay
       videoPlayer.value.muted = true
       videoPlayer.value.play().then(() => {
         // Unmute después de que comience a reproducir
         videoPlayer.value.muted = false
-      }).catch(e => {
-        console.log('Autoplay bloqueado por el navegador')
+      }).catch(() => {
         videoPlayer.value.muted = false
       })
     })
@@ -369,7 +402,7 @@ function onVideoEnded() {
 }
 
 async function updateWatchProgress(episodeCompleted = false) {
-  if (!animeId.value) return
+  if (!animeId.value || !currentProfile.value) return
   
   try {
     const currentEp = episodeCompleted ? episodeNumber.value : episodeNumber.value - 1
@@ -377,6 +410,7 @@ async function updateWatchProgress(episodeCompleted = false) {
     await authenticatedFetch(`/api/backoffice/progress/${animeId.value}/`, {
       method: 'POST',
       body: JSON.stringify({
+        profile_id: currentProfile.value.id,
         current_episode: currentEp,
         watched: false
       })

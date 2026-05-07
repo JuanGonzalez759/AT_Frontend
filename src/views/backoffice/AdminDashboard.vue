@@ -8,8 +8,8 @@ const { user, logout } = useAuth()
 
 const adminProfile = ref({
   name: 'Admin',
-  avatar: '/profiles/Profile1.png',
-  background: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1600&h=900&fit=crop',
+  avatar: '/Avatar_Anitoki.png',
+  background: '/one-piece-logo.png',
 })
 
 const animes = ref([])
