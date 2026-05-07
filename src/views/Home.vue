@@ -2,11 +2,13 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useProfile } from '../composables/useProfile'
 import AnimeCard from '../components/AnimeCard.vue'
 import ContinueWatchingCard from '../components/ContinueWatchingCard.vue'
 
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
+const { currentProfile, loadProfile } = useProfile()
 
 // Mobile menu
 const mobileMenuOpen = ref(false)
@@ -241,6 +243,9 @@ onMounted(async () => {
     router.push('/login')
   }
   
+  // Cargar perfil actual
+  await loadProfile()
+  
   // Cargar progreso PRIMERO, luego animes
   await loadUserProgress()
   await loadAnimes()
@@ -260,7 +265,6 @@ onMounted(async () => {
           <img src="/Logo_AniToki.png" alt="AniToki" class="logo" />
           <nav class="nav-links">
             <a @click="router.push('/categories')" class="nav-link" style="cursor: pointer;">Explorar</a>
-            <a href="#manga" class="nav-link">Manga</a>
             <a href="#noticias" class="nav-link">Noticias</a>
           </nav>
         </div>
@@ -306,11 +310,12 @@ onMounted(async () => {
             Reproductor
           </button>
           
-          <button class="btn-watchlist">Mi Lista</button>
+          <button class="btn-watchlist" @click="router.push('/my-list')">Mi Lista</button>
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+              <img v-if="currentProfile" :src="currentProfile.avatar" alt="Profile" class="profile-avatar" />
+              <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
             <button class="btn-logout" @click="handleLogout">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -336,7 +341,6 @@ onMounted(async () => {
         </div>
         <nav class="mobile-nav-links">
           <a @click="router.push('/categories'); toggleMobileMenu()" class="mobile-nav-link">Explorar</a>
-          <a href="#manga" class="mobile-nav-link" @click="toggleMobileMenu">Manga</a>
           <a href="#noticias" class="mobile-nav-link" @click="toggleMobileMenu">Noticias</a>
           <a href="#" class="mobile-nav-link" @click="toggleMobileMenu">Mi Lista</a>
           <a v-if="currentUser?.username === 'admin'" @click="router.push('/backoffice'); toggleMobileMenu()" class="mobile-nav-link">Gestión</a>
@@ -643,16 +647,16 @@ onMounted(async () => {
   top: 0;
   left: 0;
   right: 0;
-  background: rgba(10, 10, 10, 0.98);
-  backdrop-filter: blur(12px);
+  background: rgba(10, 10, 10, 0.95);
+  backdrop-filter: blur(10px);
   z-index: 1000;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .header-content {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 1rem 2.5rem;
+  padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -661,11 +665,11 @@ onMounted(async () => {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 3rem;
+  gap: 2rem;
 }
 
 .logo {
-  height: 45px;
+  height: 50px;
   width: auto;
   object-fit: contain;
   cursor: pointer;
@@ -673,36 +677,36 @@ onMounted(async () => {
 
 .nav-links {
   display: flex;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .nav-link {
-  color: var(--color-text-primary);
+  color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
+  font-weight: 600;
   font-size: 0.95rem;
-  font-weight: 500;
-  transition: color 0.2s ease;
+  transition: color 0.3s;
+  cursor: pointer;
   position: relative;
+  padding: 0.5rem 0;
 }
 
 .nav-link:hover {
-  color: var(--color-primary-light);
+  color: #fff;
 }
 
-.nav-link::after {
+.nav-link.active {
+  color: #a855f7;
+}
+
+.nav-link.active::after {
   content: '';
   position: absolute;
-  bottom: -8px;
+  bottom: 0;
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--color-primary);
-  transform: scaleX(0);
-  transition: transform 0.2s ease;
-}
-
-.nav-link:hover::after {
-  transform: scaleX(1);
+  background: linear-gradient(90deg, #a855f7, #9333ea);
 }
 
 .header-right {
@@ -712,81 +716,83 @@ onMounted(async () => {
 }
 
 .btn-search {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
   padding: 0.6rem;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 40px;
+  height: 40px;
 }
 
 .btn-search:hover {
-  background: rgba(147, 51, 234, 0.1);
-  border-color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .btn-watchlist {
-  background: transparent;
-  border: 1.5px solid var(--color-primary);
-  color: var(--color-primary);
-  padding: 0.6rem 1.5rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .btn-watchlist:hover {
-  background: var(--color-primary);
-  color: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .btn-admin {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: #fff;
-  padding: 0.6rem 1.5rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 0.3s;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: all 0.2s ease;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .btn-admin:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .btn-test-watch {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: #fff;
-  padding: 0.6rem 1.5rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 0.3s;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .btn-test-watch:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .user-controls {
@@ -796,44 +802,47 @@ onMounted(async () => {
 }
 
 .btn-profile {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-  color: #fff;
-  padding: 0;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  cursor: pointer;
   width: 40px;
   height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a855f7, #9333ea);
+  border: 2px solid rgba(168, 85, 247, 0.3);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 1rem;
-  transition: all 0.3s ease;
+  overflow: hidden;
+  padding: 0;
+}
+
+.btn-profile .profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .btn-profile:hover {
-  transform: scale(1.1);
-  border-color: rgba(255, 255, 255, 0.4);
-  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.5);
 }
 
 .btn-logout {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--color-text-primary);
-  padding: 0.6rem;
-  border-radius: 6px;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  transition: all 0.2s ease;
+  padding: 0.6rem;
+  transition: all 0.3s;
 }
 
 .btn-logout:hover {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: #ef4444;
-  color: #ef4444;
+  color: #fff;
+  transform: scale(1.1);
 }
 
 /* ===== HERO BANNER ===== */

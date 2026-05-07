@@ -2,10 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useProfile } from '../composables/useProfile'
 import AnimeCard from '../components/AnimeCard.vue'
 
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser } = useAuth()
+const { currentProfile, loadProfile } = useProfile()
 
 const dropdownOpen = ref(false)
 const selectedCategory = ref('all')
@@ -127,6 +129,7 @@ onMounted(async () => {
   if (!user) {
     router.push('/login')
   }
+  await loadProfile()
   await loadAnimes()
 })
 </script>
@@ -141,7 +144,6 @@ onMounted(async () => {
           <nav class="nav-links">
             <a @click="router.push('/home')" class="nav-link">Inicio</a>
             <a @click="router.push('/categories')" class="nav-link active">Explorar</a>
-            <a href="#manga" class="nav-link">Manga</a>
             <a href="#noticias" class="nav-link">Noticias</a>
           </nav>
         </div>
@@ -168,11 +170,12 @@ onMounted(async () => {
             Gestión
           </button>
           
-          <button class="btn-watchlist">Mi Lista</button>
+          <button class="btn-watchlist" @click="router.push('/my-list')">Mi Lista</button>
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+              <img v-if="currentProfile" :src="currentProfile.avatar" alt="Profile" class="profile-avatar" />
+              <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
             <button class="btn-logout" @click="handleLogout">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -486,6 +489,15 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  padding: 0;
+}
+
+.btn-profile .profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .btn-profile:hover {

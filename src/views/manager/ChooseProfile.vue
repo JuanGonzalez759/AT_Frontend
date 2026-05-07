@@ -1,13 +1,17 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useProfile } from '@/composables/useProfile'
 
 const router = useRouter()
+const { selectProfile, fetchProfiles } = useProfile()
+
 const isEditing = ref(false)
 const showEditModal = ref(false)
 const showAvatarGallery = ref(false)
 const showBackgroundGallery = ref(false)
 const editingProfile = ref(null)
+const isCreatingNew = ref(false)
 const editForm = ref({
   name: '',
   username: '',
@@ -33,40 +37,20 @@ const availableBackgrounds = ref([
   { name: 'Death Note', url: 'https://images.unsplash.com/photo-1618556450991-2f1af64e8191?w=1600&h=900&fit=crop' },
 ])
 
-const profiles = ref([
-  {
-    id: 1,
-    name: 'Abril',
-    avatar: '/profiles/Profile1.png',
-    color: '#000000',
-    background: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1600&h=900&fit=crop',
-  },
-  {
-    id: 2,
-    name: 'Laura',
-    avatar: '/profiles/Profile2.png',
-    color: '#000000',
-    background: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=1600&h=900&fit=crop',
-  },
-  {
-    id: 3,
-    name: 'Andrea',
-    avatar: '/profiles/Profile3.png',
-    color: '#000000',
-    background: 'https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=1600&h=900&fit=crop',
-  },
-  {
-    id: 4,
-    name: 'Adri',
-    avatar: '/profiles/Profile4.png',
-    color: '#000000',
-    background: 'https://images.unsplash.com/photo-1606947884439-f9f064c0f3f6?w=1600&h=900&fit=crop',
-  },
-])
+const profiles = ref([])
 
-function selectProfile(profile) {
+onMounted(async () => {
+  // Cargar perfiles del usuario desde la API
+  profiles.value = await fetchProfiles()
+})
+
+async function handleSelectProfile(profile) {
   if (isEditing.value) return
-  console.log('Perfil seleccionado:', profile.name)
+  
+  // Guardar el perfil seleccionado en localStorage
+  await selectProfile(profile.id, true)
+  
+  // Redirigir a home
   router.push('/home')
 }
 
@@ -75,6 +59,7 @@ function toggleManageProfiles() {
 }
 
 function editProfile(profile) {
+  isCreatingNew.value = false
   editingProfile.value = { ...profile }
   editForm.value = {
     name: profile.name,
@@ -85,23 +70,73 @@ function editProfile(profile) {
   showEditModal.value = true
 }
 
+function createNewProfile() {
+  isCreatingNew.value = true
+  editingProfile.value = null
+  editForm.value = {
+    name: '',
+    username: '',
+    selectedAvatar: '/profiles/Profile1.png',
+    selectedBackground: availableBackgrounds.value[0].url,
+  }
+  showEditModal.value = true
+}
+
 function closeModal() {
   showEditModal.value = false
   editingProfile.value = null
 }
 
-function saveProfile() {
+async function saveProfile() {
   if (!editForm.value.name.trim()) return
   
-  const profileIndex = profiles.value.findIndex(p => p.id === editingProfile.value.id)
-  if (profileIndex !== -1) {
-    profiles.value[profileIndex] = {
-      ...profiles.value[profileIndex],
-      name: editForm.value.name,
-      avatar: editForm.value.selectedAvatar,
-      background: editForm.value.selectedBackground,
-      color: '#000000', // Mantener el borde negro
+  try {
+    if (isCreatingNew.value) {
+      // Crear nuevo perfil
+      const response = await fetch('/api/manager/profiles/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: editForm.value.name,
+          avatar: editForm.value.selectedAvatar,
+          background: editForm.value.selectedBackground,
+          color: '#000000',
+        })
+      })
+
+      if (response.ok) {
+        const newProfile = await response.json()
+        profiles.value.push(newProfile)
+      }
+    } else {
+      // Actualizar perfil existente
+      const response = await fetch(`/api/manager/profiles/${editingProfile.value.id}/`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: editForm.value.name,
+          avatar: editForm.value.selectedAvatar,
+          background: editForm.value.selectedBackground,
+          color: '#000000',
+        })
+      })
+
+      if (response.ok) {
+        const updatedProfile = await response.json()
+        const profileIndex = profiles.value.findIndex(p => p.id === editingProfile.value.id)
+        if (profileIndex !== -1) {
+          profiles.value[profileIndex] = updatedProfile
+        }
+      }
     }
+  } catch (error) {
+    console.error('Error saving profile:', error)
   }
   
   closeModal()
@@ -143,7 +178,7 @@ function closeGallery() {
           v-for="profile in profiles"
           :key="profile.id"
           class="profile-item"
-          @click="selectProfile(profile)"
+          @click="handleSelectProfile(profile)"
         >
           <div class="profile-avatar" :style="{ borderColor: profile.color }">
             <img :src="profile.avatar" :alt="profile.name" />
@@ -162,6 +197,16 @@ function closeGallery() {
             </button>
           </div>
         </div>
+        
+        <!-- Botón para crear nuevo perfil -->
+        <div class="profile-item profile-item-add" @click="createNewProfile">
+          <div class="profile-avatar profile-avatar-add">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+          </div>
+          <p class="profile-name">Agregar Perfil</p>
+        </div>
       </div>
 
       <button class="btn-manage" @click="toggleManageProfiles">
@@ -177,7 +222,7 @@ function closeGallery() {
     <!-- Modal de Edición -->
     <div v-if="showEditModal" class="modal-overlay" @click="closeModal">
       <div class="modal-content" @click.stop>
-        <h2 class="modal-title">Editar perfil</h2>
+        <h2 class="modal-title">{{ isCreatingNew ? 'Crear nuevo perfil' : 'Editar perfil' }}</h2>
 
         <!-- Avatar Preview -->
         <div class="preview-section">
@@ -349,6 +394,27 @@ function closeGallery() {
 
 .profile-item:hover .profile-avatar {
   border-color: currentColor;
+}
+
+.profile-item-add {
+  opacity: 0.8;
+}
+
+.profile-item-add:hover {
+  opacity: 1;
+}
+
+.profile-avatar-add {
+  background: rgba(168, 85, 247, 0.2);
+  border: 4px dashed rgba(168, 85, 247, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-item-add:hover .profile-avatar-add {
+  background: rgba(168, 85, 247, 0.3);
+  border-color: #a855f7;
 }
 
 .profile-avatar img {

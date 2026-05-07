@@ -10,6 +10,7 @@ import AddAnime from '../views/backoffice/AddAnime.vue'
 import EditAnime from '../views/backoffice/EditAnime.vue'
 import ManageEpisodes from '../views/backoffice/ManageEpisodes.vue'
 import WatchAnime from '../views/WatchAnime.vue'
+import MyList from '../views/MyList.vue'
 
 const routes = [
   {
@@ -74,6 +75,12 @@ const routes = [
     path: '/categories',
     name: 'Categories',
     component: Categories,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/my-list',
+    name: 'MyList',
+    component: MyList,
     meta: { requiresAuth: true },
   },
 ]

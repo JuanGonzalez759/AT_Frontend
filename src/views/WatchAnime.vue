@@ -2,11 +2,13 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useProfile } from '../composables/useProfile'
 import Hls from 'hls.js'
 
 const router = useRouter()
 const route = useRoute()
 const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
+const { currentProfile, loadProfile } = useProfile()
 
 const animeId = ref(route.query.anime)
 const episodeNumber = ref(parseInt(route.query.episode) || 1)
@@ -87,6 +89,7 @@ onMounted(async () => {
     return
   }
   
+  await loadProfile()
   await loadAnime()
   await loadEpisodeData()
   
@@ -494,10 +497,11 @@ function goHome() {
               <path d="m21 21-4.35-4.35"></path>
             </svg>
           </button>
-          <button class="btn-watchlist" @click="router.push('/home')">Mi Lista</button>
+          <button class="btn-watchlist" @click="router.push('/my-list')">Mi Lista</button>
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+              <img v-if="currentProfile" :src="currentProfile.avatar" alt="Profile" class="profile-avatar" />
+              <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
           </div>
         </div>
@@ -779,12 +783,13 @@ function goHome() {
 
 /* ===== HEADER ===== */
 .watch-header {
-  background: var(--bg);
+  background: rgba(10, 10, 10, 0.95);
   padding: 1rem 0;
   position: sticky;
   top: 0;
   z-index: 100;
-  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .watch-header-content {
@@ -799,11 +804,11 @@ function goHome() {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 2.5rem;
+  gap: 2rem;
 }
 
 .logo {
-  height: 35px;
+  height: 50px;
   width: auto;
   object-fit: contain;
 }
@@ -816,53 +821,76 @@ function goHome() {
 .nav-link {
   color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
+  font-weight: 600;
   font-size: 0.95rem;
-  font-weight: 500;
+  transition: color 0.3s;
   cursor: pointer;
-  transition: color 0.2s;
+  position: relative;
+  padding: 0.5rem 0;
 }
 
 .nav-link:hover {
   color: #fff;
 }
 
+.nav-link.active {
+  color: #a855f7;
+}
+
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #a855f7, #9333ea);
+}
+
 .header-right {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .btn-search {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 0.6rem;
+  border-radius: 8px;
   cursor: pointer;
-  padding: 0.5rem;
+  transition: all 0.3s;
   display: flex;
   align-items: center;
-  transition: color 0.2s;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
 }
 
 .btn-search:hover {
-  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .btn-watchlist {
-  background: transparent;
-  border: 1px solid var(--line-light);
-  color: var(--text-primary);
-  padding: 0.5rem 1.25rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .btn-watchlist:hover {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: var(--purple-light);
-  color: var(--purple-light);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .user-controls {
@@ -872,24 +900,33 @@ function goHome() {
 }
 
 .btn-profile {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--purple-light), var(--purple-dark));
+  background: linear-gradient(135deg, #a855f7, #9333ea);
   border: 2px solid rgba(168, 85, 247, 0.3);
   color: #fff;
-  font-size: 1.1rem;
   font-weight: 700;
+  font-size: 1rem;
   cursor: pointer;
+  transition: all 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  overflow: hidden;
+  padding: 0;
+}
+
+.btn-profile .profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .btn-profile:hover {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.5);
 }
 
 /* ===== VIDEO PLAYER ===== */
