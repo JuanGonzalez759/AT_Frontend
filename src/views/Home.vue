@@ -294,17 +294,7 @@ onMounted(async () => {
             Gestión
           </button>
 
-          <!-- Botón de prueba para WatchAnime -->
-          <button 
-            @click="goToTestWatch" 
-            class="btn-test-watch"
-            title="Ver reproductor (PRUEBA)"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-            Reproductor
-          </button>
+          <!-- ...existing code... -->
           
           <button class="btn-watchlist">Mi Lista</button>
           
