@@ -257,7 +257,7 @@ function getCookie(name) {
 }
 
 .admin-header {
-  background: rgba(10, 10, 10, 0.95);
+  background: rgba(20, 20, 20, 0.95);
   padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
@@ -276,7 +276,7 @@ function getCookie(name) {
 }
 
 .logo-image {
-  height: 50px;
+  height: 45px;
   width: auto;
   object-fit: contain;
 }
@@ -300,10 +300,9 @@ function getCookie(name) {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #fff;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
   font-size: 0.9rem;
-  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -312,13 +311,14 @@ function getCookie(name) {
 }
 
 .btn-home:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(168, 85, 247, 0.5);
+  background: #a855f7;
+  border-color: #a855f7;
 }
 
 .btn-logout:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #ef4444;
 }
 
 .profile-section {

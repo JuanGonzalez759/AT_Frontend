@@ -1,7 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuth } from '../composables/useAuth'
 
 const props = defineProps({
   animeId: Number,
@@ -34,87 +33,14 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['watchlist-updated'])
-
 const router = useRouter()
-const { authenticatedFetch } = useAuth()
 const isHovered = ref(false)
-const inWatchlist = ref(false)
-const isProcessing = ref(false)
 
 function handleClick() {
   if (props.animeId) {
     router.push(`/watch?anime=${props.animeId}`)
   }
 }
-
-async function checkWatchlistStatus() {
-  try {
-    const profileId = localStorage.getItem('currentProfileId') || sessionStorage.getItem('currentProfileId')
-    if (!profileId || !props.animeId) return
-
-    const response = await fetch(`/api/manager/watchlist/check/${props.animeId}/?profile_id=${profileId}`, {
-      credentials: 'include'
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      inWatchlist.value = data.in_watchlist
-    }
-  } catch (error) {
-    console.error('Error checking watchlist status:', error)
-  }
-}
-
-async function toggleWatchlist(event) {
-  event.stopPropagation()
-  
-  if (isProcessing.value) return
-  isProcessing.value = true
-
-  try {
-    const profileId = localStorage.getItem('currentProfileId') || sessionStorage.getItem('currentProfileId')
-    if (!profileId) {
-      console.error('No profile selected')
-      isProcessing.value = false
-      return
-    }
-
-    if (inWatchlist.value) {
-      // Eliminar de la watchlist
-      const response = await authenticatedFetch(`/api/manager/watchlist/remove/${props.animeId}/?profile_id=${profileId}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        inWatchlist.value = false
-        emit('watchlist-updated')
-      }
-    } else {
-      // Agregar a la watchlist
-      const response = await authenticatedFetch('/api/manager/watchlist/add/', {
-        method: 'POST',
-        body: JSON.stringify({
-          anime_id: props.animeId,
-          profile_id: profileId
-        }),
-      })
-
-      if (response.ok) {
-        inWatchlist.value = true
-        emit('watchlist-updated')
-      }
-    }
-  } catch (error) {
-    console.error('Error toggling watchlist:', error)
-  } finally {
-    isProcessing.value = false
-  }
-}
-
-onMounted(() => {
-  checkWatchlistStatus()
-})
 </script>
 
 <template>
@@ -154,18 +80,6 @@ onMounted(() => {
           {{ audioType }}
         </span>
       </div>
-      
-      <!-- Botón de Watchlist (Bookmark) -->
-      <button 
-        class="btn-bookmark" 
-        :class="{ active: inWatchlist, processing: isProcessing }"
-        @click="toggleWatchlist"
-        :title="inWatchlist ? 'Quitar de Mi Lista' : 'Agregar a Mi Lista'"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" :fill="inWatchlist ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-        </svg>
-      </button>
       
       <!-- Badge demo en esquina inferior si es contenido demo -->
       <div v-if="isDemoContent" class="demo-watermark">DEMO</div>
@@ -403,56 +317,6 @@ onMounted(() => {
   font-weight: 700;
   border: 1px solid rgba(255, 255, 255, 0.3);
   z-index: 3;
-}
-
-/* Botón de Bookmark (Watchlist) */
-.btn-bookmark {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 36px;
-  height: 36px;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  z-index: 5;
-}
-
-.btn-bookmark:hover {
-  background: rgba(168, 85, 247, 0.3);
-  border-color: #a855f7;
-  transform: scale(1.1);
-}
-
-.btn-bookmark.active {
-  background: linear-gradient(135deg, #a855f7, #9333ea);
-  border-color: #a855f7;
-  color: #fff;
-}
-
-.btn-bookmark.active:hover {
-  background: linear-gradient(135deg, #9333ea, #7e22ce);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.5);
-}
-
-.btn-bookmark.processing {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-bookmark svg {
-  transition: transform 0.2s ease;
-}
-
-.btn-bookmark:hover svg {
-  transform: scale(1.1);
 }
 
 /* Overlay al hacer hover */
