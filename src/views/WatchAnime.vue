@@ -2,11 +2,13 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useProfile } from '../composables/useProfile'
 import Hls from 'hls.js'
 
 const router = useRouter()
 const route = useRoute()
 const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
+const { currentProfile, loadProfile } = useProfile()
 
 const animeId = ref(route.query.anime)
 const episodeNumber = ref(parseInt(route.query.episode) || 1)
@@ -20,6 +22,7 @@ const showFullDescription = ref(false)
 
 // HLS.js player
 const videoPlayer = ref(null)
+const playerWrapper = ref(null)
 const hls = ref(null)
 const isLoadingVideo = ref(false)
 const videoError = ref(null)
@@ -28,12 +31,29 @@ const videoDuration = ref(0)
 const isYouTubeVideo = ref(false)
 const youtubeEmbedUrl = ref('')
 
+// Controles personalizados del reproductor
+const isPlaying = ref(false)
+const currentTime = ref(0)
+const duration = ref(0)
+const volume = ref(1)
+const isMuted = ref(false)
+const showControls = ref(true)
+const controlsTimeout = ref(null)
+
+// Menú de configuración
+const showSettingsMenu = ref(false)
+const showQualitySubmenu = ref(false)
+const selectedAudio = ref('Japones')
+const selectedSubtitle = ref('Español (España)')
+const selectedQuality = ref('Auto')
+const qualityOptions = ['Auto', '1080p HD', '720p', '480p', '360p']
+
 // Estado de interacciones
 const liked = ref(false)
 const disliked = ref(false)
 const saved = ref(false)
-const likeCount = ref(0)
-const dislikeCount = ref(0) // Si quieres dislikes persistentes, deberás hacer lo mismo que con likes
+const likeCount = ref(23)
+const dislikeCount = ref(8)
 
 // Fullscreen orientation control
 function setupFullscreenOrientation() {
@@ -69,6 +89,81 @@ function setupFullscreenOrientation() {
   videoPlayer.value.addEventListener('msfullscreenchange', handleFullscreenChange)
 }
 
+// Funciones de control del reproductor personalizado
+function togglePlay() {
+  if (!videoPlayer.value) return
+  
+  if (isPlaying.value) {
+    videoPlayer.value.pause()
+  } else {
+    videoPlayer.value.play()
+  }
+}
+
+function seek(event) {
+  if (!videoPlayer.value) return
+  const progressBar = event.currentTarget
+  const rect = progressBar.getBoundingClientRect()
+  const pos = (event.clientX - rect.left) / rect.width
+  videoPlayer.value.currentTime = pos * duration.value
+}
+
+function toggleMute() {
+  if (!videoPlayer.value) return
+  isMuted.value = !isMuted.value
+  videoPlayer.value.muted = isMuted.value
+}
+
+function changeVolume(event) {
+  if (!videoPlayer.value) return
+  volume.value = parseFloat(event.target.value)
+  videoPlayer.value.volume = volume.value
+  isMuted.value = volume.value === 0
+}
+
+function toggleFullscreen() {
+  if (!playerWrapper.value) return
+  
+  if (!document.fullscreenElement) {
+    playerWrapper.value.requestFullscreen()
+  } else {
+    document.exitFullscreen()
+  }
+}
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00'
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+function handleMouseMove() {
+  showControls.value = true
+  if (controlsTimeout.value) clearTimeout(controlsTimeout.value)
+  
+  controlsTimeout.value = setTimeout(() => {
+    if (isPlaying.value) {
+      showControls.value = false
+    }
+  }, 3000)
+}
+
+function toggleSettings() {
+  showSettingsMenu.value = !showSettingsMenu.value
+  showQualitySubmenu.value = false
+}
+
+function toggleQualitySubmenu() {
+  showQualitySubmenu.value = !showQualitySubmenu.value
+}
+
+function selectQuality(quality) {
+  selectedQuality.value = quality
+  showQualitySubmenu.value = false
+  // Aquí podrías agregar lógica para cambiar la calidad del video
+}
+
 async function handleLogout() {
   try {
     await logout()
@@ -85,6 +180,7 @@ onMounted(async () => {
     return
   }
   
+  await loadProfile()
   await loadAnime()
   await loadEpisodeData()
   
@@ -129,8 +225,6 @@ async function loadAnime() {
     })
     if (response.ok) {
       anime.value = await response.json()
-      likeCount.value = anime.value.likes || 0
-      dislikeCount.value = anime.value.dislikes || 0
     }
   } catch (error) {
     console.error('Error loading anime:', error)
@@ -471,31 +565,13 @@ function toggleLike() {
   if (liked.value) {
     liked.value = false
     likeCount.value--
-    updateLikesBackend(likeCount.value)
   } else {
     liked.value = true
     likeCount.value++
-    updateLikesBackend(likeCount.value)
     if (disliked.value) {
       disliked.value = false
       dislikeCount.value--
-      updateDislikesBackend(dislikeCount.value)
     }
-  }
-}
-
-async function updateLikesBackend(newLikes) {
-  try {
-    await fetch(`/api/backoffice/public/animes/${animeId.value}/likes/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ likes: newLikes })
-    })
-  } catch (error) {
-    console.error('Error actualizando likes:', error)
   }
 }
 
@@ -503,31 +579,14 @@ function toggleDislike() {
   if (disliked.value) {
     disliked.value = false
     dislikeCount.value--
-    updateDislikesBackend(dislikeCount.value)
   } else {
     disliked.value = true
     dislikeCount.value++
-    updateDislikesBackend(dislikeCount.value)
     if (liked.value) {
       liked.value = false
       likeCount.value--
-      updateLikesBackend(likeCount.value)
     }
   }
-async function updateDislikesBackend(newDislikes) {
-  try {
-    await fetch(`/api/backoffice/public/animes/${animeId.value}/dislikes/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ dislikes: newDislikes })
-    })
-  } catch (error) {
-    console.error('Error actualizando dislikes:', error)
-  }
-}
 }
 
 function toggleSave() {
@@ -565,10 +624,11 @@ function goHome() {
               <path d="m21 21-4.35-4.35"></path>
             </svg>
           </button>
-          <button class="btn-watchlist" @click="router.push('/home')">Mi Lista</button>
+          <button class="btn-watchlist" @click="router.push('/my-list')">Mi Lista</button>
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+              <img v-if="currentProfile" :src="currentProfile.avatar" alt="Profile" class="profile-avatar" />
+              <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
           </div>
         </div>
@@ -577,7 +637,7 @@ function goHome() {
 
     <!-- Video Player -->
     <div class="player-section">
-      <div class="player-wrapper">
+      <div class="player-wrapper" ref="playerWrapper">
         <!-- Loading Spinner -->
         <div v-if="isLoadingVideo" class="video-loading">
           <div class="spinner"></div>
@@ -599,11 +659,150 @@ function goHome() {
           ref="videoPlayer"
           class="video-player"
           v-show="!isLoadingVideo && !videoError && !isYouTubeVideo"
-          controls
           preload="metadata"
-          @timeupdate="onVideoTimeUpdate"
+          :poster="anime?.cover_image || ''"
+          @play="isPlaying = true"
+          @pause="isPlaying = false"
+          @timeupdate="e => { currentTime = e.target.currentTime; onVideoTimeUpdate(e) }"
+          @loadedmetadata="e => duration = e.target.duration"
           @ended="onVideoEnded"
+          @click="togglePlay"
         ></video>
+        
+        <!-- Controles personalizados -->
+        <div 
+          v-if="!isLoadingVideo && !videoError && !isYouTubeVideo" 
+          class="custom-controls"
+          :class="{ 'show': showControls }"
+          @mousemove="handleMouseMove"
+          @click.self="togglePlay"
+        >
+          <!-- Botón de play/pause central -->
+          <button class="play-pause-center" @click="togglePlay" v-show="!isPlaying">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="white">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </button>
+          
+          <!-- Barra de controles inferior -->
+          <div class="controls-bar">
+            <!-- Barra de progreso -->
+            <div class="progress-bar" @click="seek">
+              <div class="progress-filled" :style="{ width: (currentTime / duration * 100) + '%' }"></div>
+            </div>
+            
+            <!-- Controles de reproducción -->
+            <div class="controls-bottom">
+              <div class="controls-left">
+                <button class="control-btn" @click="togglePlay">
+                  <svg v-if="!isPlaying" width="24" height="24" viewBox="0 0 24 24" fill="white">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                  <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="white">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                  </svg>
+                </button>
+                
+                <div class="time-display">
+                  <span>{{ formatTime(currentTime) }}</span>
+                  <span> / </span>
+                  <span>{{ formatTime(duration) }}</span>
+                </div>
+              </div>
+              
+              <div class="controls-right">
+                <div class="volume-control">
+                  <button class="control-btn" @click="toggleMute">
+                    <svg v-if="!isMuted && volume > 0.5" width="24" height="24" viewBox="0 0 24 24" fill="white">
+                      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                    </svg>
+                    <svg v-else-if="!isMuted && volume > 0" width="24" height="24" viewBox="0 0 24 24" fill="white">
+                      <path d="M7 9v6h4l5 5V4l-5 5H7z"/>
+                    </svg>
+                    <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="white">
+                      <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                    </svg>
+                  </button>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.1" 
+                    :value="volume" 
+                    @input="changeVolume"
+                    class="volume-slider"
+                  />
+                </div>
+                
+                <div class="settings-container">
+                  <button class="control-btn" @click="toggleSettings">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                      <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+                    </svg>
+                  </button>
+                  
+                  <!-- Menú desplegable de configuración -->
+                  <div v-if="showSettingsMenu" class="settings-menu">
+                    <div class="settings-item clickable">
+                      <span>Audio</span>
+                      <span class="settings-value">{{ selectedAudio }} 
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                          <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                        </svg>
+                      </span>
+                    </div>
+                    
+                    <div class="settings-item clickable">
+                      <span>Subtítulos</span>
+                      <span class="settings-value">{{ selectedSubtitle }} 
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                          <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                        </svg>
+                      </span>
+                    </div>
+                    
+                    <div class="settings-item clickable" @click="toggleQualitySubmenu">
+                      <span>Calidad</span>
+                      <span class="settings-value">{{ selectedQuality }} 
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                          <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <!-- Submenú de calidad -->
+                  <div v-if="showQualitySubmenu" class="quality-submenu">
+                    <div class="submenu-header" @click="showQualitySubmenu = false">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                      </svg>
+                      <span>Calidad</span>
+                    </div>
+                    <div 
+                      v-for="quality in qualityOptions" 
+                      :key="quality"
+                      class="quality-option"
+                      :class="{ active: selectedQuality === quality }"
+                      @click="selectQuality(quality)"
+                    >
+                      <span>{{ quality }}</span>
+                      <svg v-if="selectedQuality === quality" width="20" height="20" viewBox="0 0 24 24" fill="#a855f7">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                
+                <button class="control-btn" @click="toggleFullscreen">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                    <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
         
         <!-- Error Message -->
         <div v-if="videoError" class="player-error">
@@ -850,12 +1049,13 @@ function goHome() {
 
 /* ===== HEADER ===== */
 .watch-header {
-  background: var(--bg);
+  background: rgba(10, 10, 10, 0.95);
   padding: 1rem 0;
   position: sticky;
   top: 0;
   z-index: 100;
-  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .watch-header-content {
@@ -870,11 +1070,11 @@ function goHome() {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 2.5rem;
+  gap: 2rem;
 }
 
 .logo {
-  height: 35px;
+  height: 50px;
   width: auto;
   object-fit: contain;
 }
@@ -887,53 +1087,76 @@ function goHome() {
 .nav-link {
   color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
+  font-weight: 600;
   font-size: 0.95rem;
-  font-weight: 500;
+  transition: color 0.3s;
   cursor: pointer;
-  transition: color 0.2s;
+  position: relative;
+  padding: 0.5rem 0;
 }
 
 .nav-link:hover {
   color: #fff;
 }
 
+.nav-link.active {
+  color: #a855f7;
+}
+
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #a855f7, #9333ea);
+}
+
 .header-right {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .btn-search {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 0.6rem;
+  border-radius: 8px;
   cursor: pointer;
-  padding: 0.5rem;
+  transition: all 0.3s;
   display: flex;
   align-items: center;
-  transition: color 0.2s;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
 }
 
 .btn-search:hover {
-  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .btn-watchlist {
-  background: transparent;
-  border: 1px solid var(--line-light);
-  color: var(--text-primary);
-  padding: 0.5rem 1.25rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .btn-watchlist:hover {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: var(--purple-light);
-  color: var(--purple-light);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .user-controls {
@@ -943,24 +1166,33 @@ function goHome() {
 }
 
 .btn-profile {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--purple-light), var(--purple-dark));
+  background: linear-gradient(135deg, #a855f7, #9333ea);
   border: 2px solid rgba(168, 85, 247, 0.3);
   color: #fff;
-  font-size: 1.1rem;
   font-weight: 700;
+  font-size: 1rem;
   cursor: pointer;
+  transition: all 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  overflow: hidden;
+  padding: 0;
+}
+
+.btn-profile .profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .btn-profile:hover {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.5);
 }
 
 /* ===== VIDEO PLAYER ===== */
@@ -976,6 +1208,7 @@ function goHome() {
   margin: 0 auto;
   aspect-ratio: 16 / 9;
   background: var(--bg);
+  overflow: hidden;
 }
 
 .youtube-player,
@@ -986,7 +1219,289 @@ function goHome() {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: var(--bg);
+  background: #000;
+  cursor: pointer;
+}
+
+/* Controles personalizados */
+.custom-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent 0%, transparent 70%, rgba(0,0,0,0.8) 100%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.custom-controls.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.play-pause-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+}
+
+.play-pause-center:hover {
+  background: rgba(168, 85, 247, 0.8);
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.controls-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem;
+  pointer-events: all;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.progress-bar:hover {
+  height: 8px;
+}
+
+.progress-filled {
+  height: 100%;
+  background: #a855f7;
+  transition: width 0.1s;
+}
+
+.controls-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.controls-left,
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.control-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  border-radius: 4px;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.time-display {
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.volume-slider {
+  width: 80px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #a855f7;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #a855f7;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+/* Menú de configuración */
+.settings-container {
+  position: relative;
+}
+
+.settings-menu {
+  position: absolute;
+  bottom: 50px;
+  right: 0;
+  background: rgba(20, 20, 20, 0.98);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem 0;
+  min-width: 280px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+}
+
+.settings-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1.2rem;
+  color: white;
+  font-size: 0.95rem;
+  transition: background 0.2s;
+}
+
+.settings-item.clickable {
+  cursor: pointer;
+}
+
+.settings-item.clickable:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-value {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.3);
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+  background-color: #a855f7;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(24px);
+}
+
+/* Submenú de calidad */
+.quality-submenu {
+  position: absolute;
+  bottom: 50px;
+  right: 0;
+  background: rgba(20, 20, 20, 0.98);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem 0;
+  min-width: 280px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  z-index: 1001;
+}
+
+.submenu-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.2rem;
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.submenu-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.quality-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1.2rem;
+  color: white;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.quality-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.quality-option.active {
+  color: #a855f7;
 }
 
 .video-loading,
