@@ -225,6 +225,8 @@ async function loadAnime() {
     })
     if (response.ok) {
       anime.value = await response.json()
+      // Verificar si está en la watchlist
+      await checkIfInWatchlist()
     }
   } catch (error) {
     console.error('Error loading anime:', error)
@@ -590,7 +592,67 @@ function toggleDislike() {
 }
 
 function toggleSave() {
-  saved.value = !saved.value
+  if (!anime.value) return
+  
+  if (saved.value) {
+    // Eliminar de la lista
+    removeFromWatchlist()
+  } else {
+    // Agregar a la lista
+    addToWatchlist()
+  }
+}
+
+async function addToWatchlist() {
+  try {
+    const response = await authenticatedFetch('/api/manager/watchlist/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        anime_id: anime.value.id
+      })
+    })
+    
+    if (response.ok) {
+      saved.value = true
+      const data = await response.json()
+      console.log(data.message)
+    }
+  } catch (error) {
+    console.error('Error adding to watchlist:', error)
+  }
+}
+
+async function removeFromWatchlist() {
+  try {
+    const response = await authenticatedFetch(`/api/manager/watchlist/remove/${anime.value.id}/`, {
+      method: 'DELETE'
+    })
+    
+    if (response.ok) {
+      saved.value = false
+      const data = await response.json()
+      console.log(data.message)
+    }
+  } catch (error) {
+    console.error('Error removing from watchlist:', error)
+  }
+}
+
+async function checkIfInWatchlist() {
+  if (!anime.value) return
+  
+  try {
+    const response = await authenticatedFetch('/api/manager/watchlist/')
+    if (response.ok) {
+      const data = await response.json()
+      saved.value = data.some(item => item.anime.id === anime.value.id)
+    }
+  } catch (error) {
+    console.error('Error checking watchlist:', error)
+  }
 }
 
 function shareEpisode() {
@@ -1615,6 +1677,7 @@ input:checked + .toggle-slider:before {
 
 .btn-like,
 .btn-dislike,
+.btn-save,
 .btn-share {
   background: var(--bg-tertiary);
   border: 1px solid var(--line);
@@ -1632,6 +1695,7 @@ input:checked + .toggle-slider:before {
 
 .btn-like:hover,
 .btn-dislike:hover,
+.btn-save:hover,
 .btn-share:hover {
   background: rgba(168, 85, 247, 0.15);
   border-color: var(--purple-light);
@@ -1645,6 +1709,15 @@ input:checked + .toggle-slider:before {
 .btn-dislike.active {
   background: var(--purple-primary);
   border-color: var(--purple-primary);
+}
+
+.btn-save.active {
+  background: var(--purple-primary);
+  border-color: var(--purple-primary);
+}
+
+.btn-save.active svg {
+  fill: currentColor;
 }
 
 .description-section {

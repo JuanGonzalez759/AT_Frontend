@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '../composables/useAuth'
 
 const props = defineProps({
   animeId: Number,
@@ -34,13 +35,75 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const { authenticatedFetch } = useAuth()
 const isHovered = ref(false)
+const isSaved = ref(false)
 
 function handleClick() {
   if (props.animeId) {
     router.push(`/watch?anime=${props.animeId}`)
   }
 }
+
+async function toggleSave(event) {
+  event.stopPropagation() // Evitar que se active el click del card
+  
+  if (isSaved.value) {
+    await removeFromWatchlist()
+  } else {
+    await addToWatchlist()
+  }
+}
+
+async function addToWatchlist() {
+  try {
+    const response = await authenticatedFetch('/api/manager/watchlist/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        anime_id: props.animeId
+      })
+    })
+    
+    if (response.ok) {
+      isSaved.value = true
+    }
+  } catch (error) {
+    console.error('Error adding to watchlist:', error)
+  }
+}
+
+async function removeFromWatchlist() {
+  try {
+    const response = await authenticatedFetch(`/api/manager/watchlist/remove/${props.animeId}/`, {
+      method: 'DELETE'
+    })
+    
+    if (response.ok) {
+      isSaved.value = false
+    }
+  } catch (error) {
+    console.error('Error removing from watchlist:', error)
+  }
+}
+
+async function checkIfInWatchlist() {
+  try {
+    const response = await authenticatedFetch('/api/manager/watchlist/')
+    if (response.ok) {
+      const data = await response.json()
+      isSaved.value = data.some(item => item.anime.id === props.animeId)
+    }
+  } catch (error) {
+    console.error('Error checking watchlist:', error)
+  }
+}
+
+onMounted(() => {
+  checkIfInWatchlist()
+})
 </script>
 
 <template>
@@ -80,6 +143,21 @@ function handleClick() {
           {{ audioType }}
         </span>
       </div>
+      
+      <!-- Botón de guardar -->
+      <button 
+        class="save-button" 
+        :class="{ saved: isSaved }"
+        @click="toggleSave"
+        :title="isSaved ? 'Eliminar de Mi Lista' : 'Añadir a Mi Lista'"
+      >
+        <svg v-if="!isSaved" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+        <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+      </button>
       
       <!-- Badge demo en esquina inferior si es contenido demo -->
       <div v-if="isDemoContent" class="demo-watermark">DEMO</div>
@@ -398,6 +476,43 @@ function handleClick() {
   background: linear-gradient(135deg, #7e22ce 0%, #9333ea 100%);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
+}
+
+/* Botón de guardar */
+.save-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  transition: all 0.3s ease;
+  z-index: 5;
+  backdrop-filter: blur(8px);
+}
+
+.save-button:hover {
+  background: rgba(0, 0, 0, 0.85);
+  border-color: #9333ea;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
+}
+
+.save-button.saved {
+  background: linear-gradient(135deg, #9333ea 0%, #a855f7 100%);
+  border-color: #9333ea;
+}
+
+.save-button.saved:hover {
+  background: linear-gradient(135deg, #7e22ce 0%, #9333ea 100%);
+  border-color: #7e22ce;
 }
 
 /* Información debajo de la imagen */

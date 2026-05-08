@@ -15,34 +15,21 @@ const isLoading = ref(true)
 async function loadWatchlist() {
   isLoading.value = true
   try {
-    // Obtener el profile_id del localStorage o sessionStorage
-    const profileId = localStorage.getItem('currentProfileId') || sessionStorage.getItem('currentProfileId')
-    
-    if (!profileId) {
-      console.error('No hay perfil seleccionado')
-      isLoading.value = false
-      return
-    }
-    
-    const response = await fetch(`/api/manager/watchlist/?profile_id=${profileId}`, {
-      credentials: 'include'
-    })
+    const response = await authenticatedFetch('/api/manager/watchlist/')
     
     if (response.ok) {
       const data = await response.json()
       watchlistAnimes.value = data.map(item => ({
         animeId: item.anime.id,
         title: item.anime.title,
-        subtitle: `${item.anime.year} • ${item.anime.genre}`,
-        genre: item.anime.genre,
+        subtitle: `${item.anime.year} • ${item.anime.audio_type || 'SUB'}`,
         image: item.anime.cover_image,
-        episodeCount: item.anime.episode_count || 0,
+        episodeCount: 0,
         audioType: item.anime.audio_type || 'SUB',
-        ageRating: item.anime.age_rating,
-        isSimulcast: item.anime.is_simulcast,
-        rating: item.anime.rating,
+        rating: 0,
         contentType: item.anime.content_type || 'SERIE',
         addedAt: item.added_at,
+        isDemoContent: item.anime.id !== 6
       }))
     }
   } catch (error) {
