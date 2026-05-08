@@ -227,6 +227,19 @@ async function loadAnime() {
       anime.value = await response.json()
       // Verificar si está en la watchlist
       await checkIfInWatchlist()
+        // Inicializar estados de like/dislike desde la API
+        likeCount.value = anime.value.likes ?? likeCount.value
+        dislikeCount.value = anime.value.dislikes ?? dislikeCount.value
+        if (anime.value.user_reaction === 'like') {
+          liked.value = true
+          disliked.value = false
+        } else if (anime.value.user_reaction === 'dislike') {
+          disliked.value = true
+          liked.value = false
+        } else {
+          liked.value = false
+          disliked.value = false
+        }
     }
   } catch (error) {
     console.error('Error loading anime:', error)
@@ -563,31 +576,55 @@ function retryVideo() {
   loadEpisodeSources()
 }
 
-function toggleLike() {
-  if (liked.value) {
-    liked.value = false
-    likeCount.value--
-  } else {
-    liked.value = true
-    likeCount.value++
-    if (disliked.value) {
-      disliked.value = false
-      dislikeCount.value--
+async function toggleLike() {
+  if (!anime.value) return
+  const pk = anime.value.id
+  const action = liked.value ? 'remove' : 'like'
+
+  try {
+    const response = await authenticatedFetch(`/api/backoffice/public/animes/${pk}/react/`, {
+      method: 'POST',
+      body: JSON.stringify({ action })
+    })
+
+    if (!response.ok) {
+      console.error('Error reacting to anime (like):', await response.text())
+      return
     }
+
+    const data = await response.json()
+    likeCount.value = data.likes
+    dislikeCount.value = data.dislikes
+    liked.value = data.user_reaction === 'like'
+    disliked.value = data.user_reaction === 'dislike'
+  } catch (error) {
+    console.error('Error toggling like:', error)
   }
 }
 
-function toggleDislike() {
-  if (disliked.value) {
-    disliked.value = false
-    dislikeCount.value--
-  } else {
-    disliked.value = true
-    dislikeCount.value++
-    if (liked.value) {
-      liked.value = false
-      likeCount.value--
+async function toggleDislike() {
+  if (!anime.value) return
+  const pk = anime.value.id
+  const action = disliked.value ? 'remove' : 'dislike'
+
+  try {
+    const response = await authenticatedFetch(`/api/backoffice/public/animes/${pk}/react/`, {
+      method: 'POST',
+      body: JSON.stringify({ action })
+    })
+
+    if (!response.ok) {
+      console.error('Error reacting to anime (dislike):', await response.text())
+      return
     }
+
+    const data = await response.json()
+    likeCount.value = data.likes
+    dislikeCount.value = data.dislikes
+    liked.value = data.user_reaction === 'like'
+    disliked.value = data.user_reaction === 'dislike'
+  } catch (error) {
+    console.error('Error toggling dislike:', error)
   }
 }
 
