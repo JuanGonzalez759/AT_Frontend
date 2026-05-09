@@ -61,6 +61,12 @@ const filteredEpisodes = computed(() => {
   return sorted.slice(start, end)
 })
 
+const showSeasons = computed(() => {
+  const slug = anime.value?.anime_slug?.toLowerCase() || ''
+  const title = (anime.value?.title || '').toLowerCase()
+  return slug === 'one-piece' || title.includes('one piece') || anime.value?.id === 6
+})
+
 // HLS.js player
 const videoPlayer = ref(null)
 const playerWrapper = ref(null)
@@ -1129,7 +1135,7 @@ function goHome() {
       <div class="modal-content">
         <div class="modal-header">
           <h2>Episodios - {{ anime?.title }}</h2>
-          <div style="display:flex;align-items:center;gap:0.75rem">
+          <div v-if="showSeasons" style="display:flex;align-items:center;gap:0.75rem">
             <label style="color:rgba(255,255,255,0.8);font-weight:600">Temporada:</label>
             <select v-model="seasonSelected" class="season-select">
               <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
