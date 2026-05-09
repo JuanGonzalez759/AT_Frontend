@@ -699,6 +699,36 @@ function shareEpisode() {
   alert('Enlace copiado al portapapeles')
 }
 
+// Hardcoded descriptions for One Piece (episodes 1-10)
+const onePieceDescriptions = {
+  1: `Romance Dawn — Se muestra la infancia de Monkey D. Luffy y su relación con Shanks. Luffy come accidentalmente la Fruta Gomu Gomu y obtiene poderes elásticos. Después de que Shanks le salva la vida, Luffy decide convertirse en Rey de los Piratas.`,
+  2: `Ellos lo llaman ‘Sombrero de Paja Luffy’ — Luffy llega a una isla dominada por la pirata Alvida y conoce a Koby, un joven obligado a trabajar para ella.`,
+  3: `Morgan contra Luffy — Luffy llega a la base de la Marina controlada por Axe-Hand Morgan y conoce al espadachín capturado Roronoa Zoro.`,
+  4: `El pasado del capitán Morgan — Se explica cómo Morgan ganó fama en la Marina y cómo su poder lo volvió tiránico. Luffy intenta convencer a Zoro de unirse a él.`,
+  5: `El Rey de los Piratas y el Maestro Espadachín — Zoro acepta convertirse en compañero de Luffy tras ser liberado. Ambos derrotan a Morgan y abandonan la isla.`,
+  6: `El primer compañero — Zoro se une oficialmente a la tripulación. Koby decide entrar en la Marina para perseguir su sueño.`,
+  7: `Amigos — Luffy y Zoro llegan a una nueva ciudad donde conocen a la ladrona Nami, especializada en robar a piratas.`,
+  8: `Nami — Aparece el pirata Buggy el Payaso, usuario de una fruta del diablo. Nami intenta aprovecharse tanto de Luffy como de Buggy.`,
+  9: `La mujer demonio — Buggy demuestra sus poderes de separación corporal mientras captura a Luffy. Nami empieza a cuestionar sus prejuicios contra los piratas.`,
+ 10: `Incidente en la taberna — Se desarrolla el conflicto contra Buggy y se profundiza en la personalidad despreocupada y valiente de Luffy.`
+}
+
+const displayedDescription = computed(() => {
+  // Priorizar descripción del episodio o del anime si existe
+  const desc = currentEpisode.value?.description || anime.value?.description || ''
+  if (desc && desc.trim().length > 0) return desc
+
+  // Si es One Piece (slug o título o id conocido), usar hardcoded
+  const slug = anime.value?.anime_slug?.toLowerCase()
+  const title = (anime.value?.title || '').toLowerCase()
+  if (slug === 'one-piece' || title.includes('one piece') || anime.value?.id === 6) {
+    const num = currentEpisode.value?.episode_number
+    if (num && onePieceDescriptions[num]) return onePieceDescriptions[num]
+  }
+
+  return 'Sin descripción disponible.'
+})
+
 function goHome() {
   router.push('/home')
 }
@@ -975,12 +1005,12 @@ function goHome() {
           <!-- Description -->
           <div class="description-section" v-if="currentEpisode || anime">
             <p :class="{ expanded: showFullDescription }">
-              {{ currentEpisode?.description || anime?.description || 'Sin descripción disponible.' }}
+              {{ displayedDescription }}
             </p>
             <button 
               class="btn-show-more" 
               @click="showFullDescription = !showFullDescription"
-              v-if="(currentEpisode?.description || anime?.description)?.length > 150"
+              v-if="displayedDescription && displayedDescription.length > 150"
             >
               {{ showFullDescription ? 'VER MENOS' : 'VER MÁS' }}
             </button>
