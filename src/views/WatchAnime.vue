@@ -229,6 +229,7 @@ onMounted(async () => {
   
   await loadProfile()
   await loadAnime()
+  await loadAnimeProgress()
   await loadEpisodeData()
   
   // Esperar a que el DOM esté completamente renderizado
@@ -261,6 +262,11 @@ watch([animeId, episodeNumber], async () => {
   await loadEpisodeData()
   await nextTick()
   await loadEpisodeSources()
+})
+
+// Watch for animeId changes to refresh progress
+watch(animeId, async () => {
+  await loadAnimeProgress()
 })
 
 async function loadAnime() {
@@ -560,16 +566,17 @@ async function updateWatchProgress(episodeCompleted = false) {
   if (!animeId.value || !currentProfile.value) return
   
   try {
-    const currentEp = episodeCompleted ? episodeNumber.value : episodeNumber.value - 1
-    
+    const currentEp = episodeNumber.value || 1
     await authenticatedFetch(`/api/backoffice/progress/${animeId.value}/`, {
       method: 'POST',
       body: JSON.stringify({
         profile_id: currentProfile.value.id,
         current_episode: currentEp,
-        watched: false
+        watched: !!episodeCompleted
       })
     })
+    // refresh local progress after update
+    await loadAnimeProgress()
   } catch (error) {
     console.error('Error updating watch progress:', error)
   }
@@ -774,6 +781,50 @@ const displayedDescription = computed(() => {
   }
 
   return 'Sin descripción disponible.'
+})
+
+// Watch progress state
+const animeProgress = ref({ current_episode: 0, watched: false })
+
+async function loadAnimeProgress() {
+  if (!animeId.value) return
+  try {
+    const resp = await authenticatedFetch(`/api/backoffice/progress/${animeId.value}/`)
+    if (resp.ok) {
+      const data = await resp.json()
+      animeProgress.value = {
+        current_episode: data.current_episode || 0,
+        watched: !!data.watched
+      }
+    }
+  } catch (e) {
+    console.error('Error loading anime progress:', e)
+  }
+}
+
+function goToContinueWatching() {
+  const prog = animeProgress.value || { current_episode: 0, watched: false }
+  let target = 1
+  if (prog.current_episode && prog.current_episode > 0) {
+    // If last episode was fully watched, go to next ep, else resume that ep
+    if (prog.watched) {
+      target = Math.min((prog.current_episode || 0) + 1, anime.value?.episode_count || (prog.current_episode || 1))
+    } else {
+      target = prog.current_episode
+    }
+  }
+
+  const ep = episodes.value.find(e => e.episode_number === target)
+  if (ep) selectEpisode(ep)
+  else if (episodes.value.length > 0) selectEpisode(episodes.value[0])
+}
+
+const continueEpisode = computed(() => {
+  const prog = animeProgress.value || { current_episode: 0, watched: false }
+  const total = anime.value?.episode_count || episodes.value.length || 0
+  if (!prog.current_episode || prog.current_episode === 0) return 1
+  if (prog.watched) return Math.min(prog.current_episode + 1, total || prog.current_episode + 1)
+  return prog.current_episode
 })
 
 function goHome() {
@@ -1046,6 +1097,9 @@ function goHome() {
                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
                 <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
               </svg>
+            </button>
+            <button class="btn-continue" v-if="animeProgress.current_episode > 0" @click="goToContinueWatching">
+              SEGUIR VIENDO E{{ continueEpisode }}
             </button>
           </div>
 
@@ -1814,6 +1868,22 @@ input:checked + .toggle-slider:before {
   font-size: 0.9rem;
   font-weight: 600;
   transition: all 0.2s;
+}
+
+.btn-continue {
+  background: linear-gradient(90deg, #a855f7, #9333ea);
+  border: none;
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-continue:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(168,85,247,0.18);
 }
 
 .btn-like:hover,
