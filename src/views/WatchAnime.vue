@@ -18,7 +18,48 @@ const episodes = ref([])
 const currentEpisode = ref(null)
 const isLoading = ref(true)
 const showAllEpisodes = ref(false)
+// Seasons for One Piece (10 seasons) - use provided canonical names
+const seasons = [
+  'East Blue',
+  'Entrada a Grand Line',
+  'Drum Island',
+  'Arabasta',
+  'Sueños',
+  'Skypiea',
+  'Fortaleza Naval G-8',
+  'Water 7',
+  'Enies Lobby',
+  'Thriller Bark'
+]
+const seasonSelected = ref(seasons[0])
 const showFullDescription = ref(false)
+
+const filteredEpisodes = computed(() => {
+  if (!episodes.value || episodes.value.length === 0) return []
+
+  // Sort episodes by episode_number
+  const sorted = [...episodes.value].sort((a, b) => a.episode_number - b.episode_number)
+  const total = sorted.length
+  const groups = seasons.length
+
+  if (groups <= 0) return sorted
+
+  const base = Math.floor(total / groups)
+  const remainder = total % groups
+
+  // Find selected season index
+  const idx = Math.max(0, seasons.indexOf(seasonSelected.value))
+
+  // Calculate start index: each of the first `remainder` groups gets (base+1) items
+  let start = 0
+  for (let i = 0; i < idx; i++) {
+    start += base + (i < remainder ? 1 : 0)
+  }
+  const size = base + (idx < remainder ? 1 : 0)
+  const end = start + size
+
+  return sorted.slice(start, end)
+})
 
 // HLS.js player
 const videoPlayer = ref(null)
@@ -1088,6 +1129,12 @@ function goHome() {
       <div class="modal-content">
         <div class="modal-header">
           <h2>Episodios - {{ anime?.title }}</h2>
+          <div style="display:flex;align-items:center;gap:0.75rem">
+            <label style="color:rgba(255,255,255,0.8);font-weight:600">Temporada:</label>
+            <select v-model="seasonSelected" class="season-select">
+              <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
+            </select>
+          </div>
           <button class="btn-close" @click="showAllEpisodes = false">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1096,8 +1143,11 @@ function goHome() {
           </button>
         </div>
         <div class="modal-episodes-list">
+          <div v-if="filteredEpisodes.length === 0" style="color:rgba(255,255,255,0.7);padding:1rem">
+            No hay episodios para la temporada seleccionada.
+          </div>
           <div 
-            v-for="episode in episodes" 
+            v-for="episode in filteredEpisodes" 
             :key="episode.id"
             class="episode-item"
             :class="{ active: currentEpisode?.id === episode.id }"
@@ -1980,6 +2030,28 @@ input:checked + .toggle-slider:before {
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
+}
+
+.season-select {
+  background: rgba(255,255,255,0.95);
+  border: 1px solid rgba(0,0,0,0.08);
+  color: #000;
+  padding: 0.18rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1;
+  width: auto;
+  min-width: 80px;
+  max-width: 140px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.season-select option {
+  color: #000;
+  background: #fff;
 }
 
 .btn-close {
