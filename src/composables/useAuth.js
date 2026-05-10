@@ -116,16 +116,22 @@ export function useAuth() {
     await setCsrfCookie()
     const csrfToken = getCookie('csrftoken')
     
-    const defaultOptions = {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
-        ...options.headers,
-      },
+    // Separar headers de otras opciones para evitar sobrescritura
+    const { headers: optionsHeaders, ...restOptions } = options
+    
+    const mergedHeaders = {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken,
+      ...optionsHeaders,
     }
     
-    return fetch(url, { ...defaultOptions, ...options })
+    const finalOptions = {
+      credentials: 'include',
+      headers: mergedHeaders,
+      ...restOptions
+    }
+    
+    return fetch(url, finalOptions)
   }
 
   return {

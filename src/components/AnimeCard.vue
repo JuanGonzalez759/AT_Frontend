@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuth } from '../composables/useAuth'
+import { useProfile } from '../composables/useProfile'
+import { useWatchlist } from '../composables/useWatchlist'
 
 const props = defineProps({
   animeId: Number,
@@ -35,8 +36,9 @@ const props = defineProps({
 })
 
 const router = useRouter()
-const { authenticatedFetch } = useAuth()
-const emit = defineEmits(['show-info'])
+const { currentProfile } = useProfile()
+const { loadWatchlist, isInWatchlist, addToWatchlist, removeFromWatchlist } = useWatchlist()
+const emit = defineEmits(['show-info', 'watchlist-updated'])
 const isHovered = ref(false)
 const isSaved = ref(false)
 
@@ -64,61 +66,48 @@ function emitShowInfo() {
 async function toggleSave(event) {
   event.stopPropagation() // Evitar que se active el click del card
   
+  // Verificar que hay un perfil seleccionado
+  if (!currentProfile.value) {
+    console.warn('No profile selected, cannot save to watchlist')
+    return
+  }
+  
   if (isSaved.value) {
-    await removeFromWatchlist()
-  } else {
-    await addToWatchlist()
-  }
-}
-
-async function addToWatchlist() {
-  try {
-    const response = await authenticatedFetch('/api/manager/watchlist/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        anime_id: props.animeId
-      })
-    })
-    
-    if (response.ok) {
-      isSaved.value = true
-    }
-  } catch (error) {
-    console.error('Error adding to watchlist:', error)
-  }
-}
-
-async function removeFromWatchlist() {
-  try {
-    const response = await authenticatedFetch(`/api/manager/watchlist/remove/${props.animeId}/`, {
-      method: 'DELETE'
-    })
-    
-    if (response.ok) {
+    const success = await removeFromWatchlist(props.animeId)
+    if (success) {
       isSaved.value = false
+      emit('watchlist-updated')
     }
-  } catch (error) {
-    console.error('Error removing from watchlist:', error)
+  } else {
+    const success = await addToWatchlist(props.animeId)
+    if (success) {
+      isSaved.value = true
+      emit('watchlist-updated')
+    }
   }
 }
 
 async function checkIfInWatchlist() {
+  // Solo verificar si hay un perfil seleccionado
+  if (!currentProfile.value) {
+    isSaved.value = false
+    return
+  }
+  
   try {
-    const response = await authenticatedFetch('/api/manager/watchlist/')
-    if (response.ok) {
-      const data = await response.json()
-      isSaved.value = data.some(item => item.anime.id === props.animeId)
-    }
+    await loadWatchlist()
+    isSaved.value = isInWatchlist(props.animeId)
   } catch (error) {
-    console.error('Error checking watchlist:', error)
+    console.debug('Could not check watchlist status:', error)
+    isSaved.value = false
   }
 }
 
+// Solo verificar en watchlist si realmente hay un perfil
 onMounted(() => {
-  checkIfInWatchlist()
+  if (currentProfile.value) {
+    checkIfInWatchlist()
+  }
 })
 </script>
 

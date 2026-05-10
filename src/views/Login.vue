@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
-const { login } = useAuth()
+const { login, authenticatedFetch } = useAuth()
 
 const username = ref('')
 const password = ref('')
@@ -34,12 +34,18 @@ async function handleLogin() {
   }
 
   try {
+    // Limpiar cualquier perfil guardado de otro usuario
+    localStorage.removeItem('currentProfileId')
+    sessionStorage.removeItem('currentProfileId')
+    
     const user = await login(username.value, password.value)
+    
     // Redirigir según el tipo de usuario
     if (user?.username === 'admin') {
       router.push('/backoffice')
     } else {
-      router.push('/home')
+      // Redirigir a la página de selección de perfiles
+      router.push('/manager/profiles')
     }
   } catch (error) {
     errorMessage.value = error.message

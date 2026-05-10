@@ -141,7 +141,8 @@ async function handleRegister() {
 
   try {
     await register(username.value, email.value, password.value)
-    router.push('/home')
+    // Redirigir a selección de perfiles para que el usuario configure su perfil
+    router.push('/manager/profiles')
   } catch (error) {
     passwordError.value = error.message
   }

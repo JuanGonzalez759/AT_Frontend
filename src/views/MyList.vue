@@ -3,11 +3,13 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useProfile } from '../composables/useProfile'
+import { useWatchlist } from '../composables/useWatchlist'
 import AnimeCard from '../components/AnimeCard.vue'
 
 const router = useRouter()
-const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
+const { currentUser, logout, loadCurrentUser } = useAuth()
 const { currentProfile, loadProfile } = useProfile()
+const { loadWatchlist: loadWatchlistData, clearCache } = useWatchlist()
 
 const watchlistAnimes = ref([])
 const isLoading = ref(true)
@@ -15,28 +17,35 @@ const isLoading = ref(true)
 async function loadWatchlist() {
   isLoading.value = true
   try {
-    const response = await authenticatedFetch('/api/manager/watchlist/')
-    
-    if (response.ok) {
-      const data = await response.json()
-      watchlistAnimes.value = data.map(item => ({
-        animeId: item.anime.id,
-        title: item.anime.title,
-        subtitle: `${item.anime.year} • ${item.anime.audio_type || 'SUB'}`,
-        image: item.anime.cover_image,
-        episodeCount: 0,
-        audioType: item.anime.audio_type || 'SUB',
-        rating: 0,
-        contentType: item.anime.content_type || 'SERIE',
-        addedAt: item.added_at,
-        isDemoContent: item.anime.id !== 6
-      }))
+    // Verificar que hay un perfil seleccionado
+    if (!currentProfile.value) {
+      router.push('/manager/profiles')
+      return
     }
+    
+    const data = await loadWatchlistData()
+    watchlistAnimes.value = data.map(item => ({
+      animeId: item.anime.id,
+      title: item.anime.title,
+      subtitle: `${item.anime.year} • ${item.anime.audio_type || 'SUB'}`,
+      image: item.anime.cover_image,
+      episodeCount: 0,
+      audioType: item.anime.audio_type || 'SUB',
+      rating: 0,
+      contentType: item.anime.content_type || 'SERIE',
+      addedAt: item.added_at,
+      isDemoContent: item.anime.id !== 6
+    }))
   } catch (error) {
     console.error('Error loading watchlist:', error)
   } finally {
     isLoading.value = false
   }
+}
+
+async function handleWatchlistUpdate() {
+  clearCache()
+  await loadWatchlist()
 }
 
 async function handleLogout() {
@@ -54,7 +63,14 @@ onMounted(async () => {
     router.push('/login')
     return
   }
-  await loadProfile()
+  
+  const profile = await loadProfile()
+  if (!profile) {
+    // Si no hay perfil, redirigir a selección de perfiles
+    router.push('/manager/profiles')
+    return
+  }
+  
   await loadWatchlist()
 })
 </script>
@@ -149,7 +165,7 @@ onMounted(async () => {
             v-for="anime in watchlistAnimes"
             :key="anime.animeId"
             v-bind="anime"
-            @watchlist-updated="loadWatchlist"
+            @watchlist-updated="handleWatchlistUpdate"
           />
         </div>
       </div>

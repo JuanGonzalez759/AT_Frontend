@@ -2,6 +2,22 @@ import { ref } from 'vue'
 
 const currentProfile = ref(null)
 
+// Helper functions
+function getCookie(name) {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) {
+    return parts.pop().split(';').shift()
+  }
+  return ''
+}
+
+async function setCsrfCookie() {
+  await fetch('/api/csrf/', {
+    credentials: 'include',
+  })
+}
+
 export function useProfile() {
   async function loadProfile() {
     const profileId = localStorage.getItem('currentProfileId') || sessionStorage.getItem('currentProfileId')
@@ -12,12 +28,28 @@ export function useProfile() {
     }
 
     try {
+      // Primero verificar que el perfil existe
       const response = await fetch(`/api/manager/profiles/${profileId}/`, {
         credentials: 'include'
       })
 
       if (response.ok) {
         const data = await response.json()
+        
+        // Guardar el perfil en la sesión del backend
+        await setCsrfCookie()
+        const csrfToken = getCookie('csrftoken')
+        
+        await fetch('/api/manager/profiles/select/', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+          },
+          body: JSON.stringify({ profile_id: profileId })
+        })
+        
         currentProfile.value = data
         return data
       } else {
@@ -35,14 +67,40 @@ export function useProfile() {
   }
 
   async function selectProfile(profileId, remember = true) {
-    if (remember) {
-      localStorage.setItem('currentProfileId', profileId)
-    } else {
-      sessionStorage.setItem('currentProfileId', profileId)
-    }
+    try {
+      // Guardar el perfil en la sesión del backend
+      await setCsrfCookie()
+      const csrfToken = getCookie('csrftoken')
+      
+      const response = await fetch('/api/manager/profiles/select/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify({ profile_id: profileId })
+      })
 
-    // Cargar datos del perfil
-    return await loadProfile()
+      if (!response.ok) {
+        throw new Error('Failed to select profile')
+      }
+
+      const data = await response.json()
+      currentProfile.value = data.profile
+
+      // También guardar en localStorage/sessionStorage para persistencia
+      if (remember) {
+        localStorage.setItem('currentProfileId', profileId)
+      } else {
+        sessionStorage.setItem('currentProfileId', profileId)
+      }
+
+      return data.profile
+    } catch (error) {
+      console.error('Error selecting profile:', error)
+      return null
+    }
   }
 
   function clearProfile() {

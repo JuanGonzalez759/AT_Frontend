@@ -698,9 +698,6 @@ async function addToWatchlist() {
   try {
     const response = await authenticatedFetch('/api/manager/watchlist/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         anime_id: anime.value.id
       })

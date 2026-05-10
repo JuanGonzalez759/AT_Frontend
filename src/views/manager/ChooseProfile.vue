@@ -1,18 +1,25 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '../../composables/useAuth'
+import { useProfile } from '../../composables/useProfile'
 
 const router = useRouter()
+const { loadCurrentUser, authenticatedFetch } = useAuth()
+const { selectProfile: selectProfileComposable } = useProfile()
+
 const isEditing = ref(false)
 const showEditModal = ref(false)
+const showCreateModal = ref(false)
 const showAvatarGallery = ref(false)
 const showBackgroundGallery = ref(false)
 const editingProfile = ref(null)
+const isCreating = ref(false)
 const editForm = ref({
   name: '',
-  username: '',
   selectedAvatar: '',
   selectedBackground: '',
+  selectedColor: '#000000',
 })
 
 const availableAvatars = ref([
@@ -33,78 +40,152 @@ const availableBackgrounds = ref([
   { name: 'Death Note', url: 'https://images.unsplash.com/photo-1618556450991-2f1af64e8191?w=1600&h=900&fit=crop' },
 ])
 
-const profiles = ref([
-  {
-    id: 1,
-    name: 'Abril',
-    avatar: '/profiles/Profile1.png',
-    color: '#000000',
-    background: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1600&h=900&fit=crop',
-  },
-  {
-    id: 2,
-    name: 'Laura',
-    avatar: '/profiles/Profile2.png',
-    color: '#000000',
-    background: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=1600&h=900&fit=crop',
-  },
-  {
-    id: 3,
-    name: 'Andrea',
-    avatar: '/profiles/Profile3.png',
-    color: '#000000',
-    background: 'https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=1600&h=900&fit=crop',
-  },
-  {
-    id: 4,
-    name: 'Adri',
-    avatar: '/profiles/Profile4.png',
-    color: '#000000',
-    background: 'https://images.unsplash.com/photo-1606947884439-f9f064c0f3f6?w=1600&h=900&fit=crop',
-  },
-])
+const profiles = ref([])
+const isLoading = ref(true)
+const MAX_PROFILES = 4
 
-function selectProfile(profile) {
+async function loadProfiles() {
+  isLoading.value = true
+  try {
+    const response = await authenticatedFetch('/api/manager/profiles/')
+    if (response.ok) {
+      profiles.value = await response.json()
+      console.log('Perfiles cargados:', profiles.value.length)
+    }
+  } catch (error) {
+    console.error('Error loading profiles:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function handleSelectProfile(profile) {
   if (isEditing.value) return
-  console.log('Perfil seleccionado:', profile.name)
-  router.push('/home')
+  
+  try {
+    console.log('Perfil seleccionado:', profile.name)
+    await selectProfileComposable(profile.id, true)
+    router.push('/home')
+  } catch (error) {
+    console.error('Error selecting profile:', error)
+  }
 }
 
 function toggleManageProfiles() {
   isEditing.value = !isEditing.value
 }
 
+function openCreateModal() {
+  if (profiles.value.length >= MAX_PROFILES) {
+    alert(`Máximo ${MAX_PROFILES} perfiles permitidos por cuenta`)
+    return
+  }
+  
+  isCreating.value = true
+  editForm.value = {
+    name: '',
+    selectedAvatar: availableAvatars.value[0],
+    selectedBackground: availableBackgrounds.value[0].url,
+    selectedColor: '#000000',
+  }
+  showCreateModal.value = true
+}
+
 function editProfile(profile) {
+  isCreating.value = false
   editingProfile.value = { ...profile }
   editForm.value = {
     name: profile.name,
-    username: '',
     selectedAvatar: profile.avatar,
     selectedBackground: profile.background,
+    selectedColor: profile.color || '#000000',
   }
   showEditModal.value = true
 }
 
 function closeModal() {
   showEditModal.value = false
+  showCreateModal.value = false
   editingProfile.value = null
+  isCreating.value = false
 }
 
-function saveProfile() {
-  if (!editForm.value.name.trim()) return
-  
-  const profileIndex = profiles.value.findIndex(p => p.id === editingProfile.value.id)
-  if (profileIndex !== -1) {
-    profiles.value[profileIndex] = {
-      ...profiles.value[profileIndex],
-      name: editForm.value.name,
-      avatar: editForm.value.selectedAvatar,
-      background: editForm.value.selectedBackground,
-      color: '#000000', // Mantener el borde negro
-    }
+async function saveProfile() {
+  if (!editForm.value.name.trim()) {
+    alert('El nombre del perfil es obligatorio')
+    return
   }
   
-  closeModal()
+  try {
+    if (isCreating.value) {
+      // Crear nuevo perfil
+      const response = await authenticatedFetch('/api/manager/profiles/', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: editForm.value.name,
+          avatar: editForm.value.selectedAvatar,
+          background: editForm.value.selectedBackground,
+          color: editForm.value.selectedColor,
+        })
+      })
+      
+      if (response.ok) {
+        await loadProfiles()
+        closeModal()
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Error al crear el perfil')
+      }
+    } else {
+      // Actualizar perfil existente
+      const response = await authenticatedFetch(`/api/manager/profiles/${editingProfile.value.id}/`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: editForm.value.name,
+          avatar: editForm.value.selectedAvatar,
+          background: editForm.value.selectedBackground,
+          color: editForm.value.selectedColor,
+        })
+      })
+      
+      if (response.ok) {
+        await loadProfiles()
+        closeModal()
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Error al actualizar el perfil')
+      }
+    }
+  } catch (error) {
+    console.error('Error saving profile:', error)
+    alert('Error al guardar el perfil')
+  }
+}
+
+async function deleteProfile(profileId) {
+  if (!confirm('¿Estás seguro de que quieres eliminar este perfil?')) {
+    return
+  }
+  
+  if (profiles.value.length === 1) {
+    alert('No puedes eliminar el último perfil')
+    return
+  }
+  
+  try {
+    const response = await authenticatedFetch(`/api/manager/profiles/${profileId}/`, {
+      method: 'DELETE'
+    })
+    
+    if (response.ok) {
+      await loadProfiles()
+    } else {
+      alert('Error al eliminar el perfil')
+    }
+  } catch (error) {
+    console.error('Error deleting profile:', error)
+    alert('Error al eliminar el perfil')
+  }
 }
 
 function selectAvatar(avatar) {
@@ -129,6 +210,15 @@ function closeGallery() {
   showAvatarGallery.value = false
   showBackgroundGallery.value = false
 }
+
+onMounted(async () => {
+  const user = await loadCurrentUser()
+  if (!user) {
+    router.push('/login')
+    return
+  }
+  await loadProfiles()
+})
 </script>
 
 <template>
@@ -137,13 +227,18 @@ function closeGallery() {
       <h1 class="logo">AniToki</h1>
     </div>
 
-    <div class="profile-content">
+    <div v-if="isLoading" class="loading">
+      <p>Cargando perfiles...</p>
+    </div>
+
+    <div v-else class="profile-content">
       <div class="profiles-grid">
+        <!-- Perfiles existentes -->
         <div
           v-for="profile in profiles"
           :key="profile.id"
           class="profile-item"
-          @click="selectProfile(profile)"
+          @click="handleSelectProfile(profile)"
         >
           <div class="profile-avatar" :style="{ borderColor: profile.color }">
             <img :src="profile.avatar" :alt="profile.name" />
@@ -160,7 +255,31 @@ function closeGallery() {
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
             </button>
+            <button 
+              v-if="isEditing && profiles.length > 1" 
+              class="btn-delete"
+              @click.stop="deleteProfile(profile.id)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
           </div>
+        </div>
+
+        <!-- Botón para agregar perfil -->
+        <div
+          v-if="profiles.length < MAX_PROFILES && !isEditing"
+          class="profile-item profile-item-add"
+          @click="openCreateModal"
+        >
+          <div class="profile-avatar-add">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+          </div>
+          <p class="profile-name">Agregar Perfil</p>
         </div>
       </div>
 
@@ -174,10 +293,10 @@ function closeGallery() {
       </button>
     </div>
 
-    <!-- Modal de Edición -->
-    <div v-if="showEditModal" class="modal-overlay" @click="closeModal">
+    <!-- Modal de Edición/Creación -->
+    <div v-if="showEditModal || showCreateModal" class="modal-overlay" @click="closeModal">
       <div class="modal-content" @click.stop>
-        <h2 class="modal-title">Editar perfil</h2>
+        <h2 class="modal-title">{{ isCreating ? 'Crear perfil' : 'Editar perfil' }}</h2>
 
         <!-- Avatar Preview -->
         <div class="preview-section">
@@ -220,16 +339,6 @@ function closeGallery() {
             type="text" 
             class="modal-input"
             placeholder="Nombre del perfil"
-          />
-        </div>
-
-        <div class="form-group">
-          <label>Nombre de Usuario (opcional)</label>
-          <input 
-            v-model="editForm.username" 
-            type="text" 
-            class="modal-input"
-            placeholder="Ingrese su nombre de usuario aquí"
           />
         </div>
 
@@ -388,6 +497,68 @@ function closeGallery() {
   background: #a855f7;
   border-color: #a855f7;
   transform: scale(1.1);
+}
+
+.btn-delete {
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(255, 0, 0, 0.2);
+  color: #ff4444;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.btn-delete:hover {
+  background: #ff4444;
+  border-color: #ff4444;
+  color: #fff;
+  transform: scale(1.1);
+}
+
+.profile-item-add {
+  opacity: 0.7;
+}
+
+.profile-item-add:hover {
+  opacity: 1;
+}
+
+.profile-avatar-add {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 4px dashed rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.profile-item-add:hover .profile-avatar-add {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.profile-avatar-add svg {
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.3s;
+}
+
+.profile-item-add:hover .profile-avatar-add svg {
+  color: #a855f7;
+}
+
+.loading {
+  color: #fff;
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.2rem;
 }
 
 .btn-manage {

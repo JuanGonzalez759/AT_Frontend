@@ -2,10 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useProfile } from '../composables/useProfile'
 import AnimeCard from '../components/AnimeCard.vue'
 
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser } = useAuth()
+const { loadProfile } = useProfile()
 
 const dropdownOpen = ref(false)
 const selectedCategory = ref('all')
@@ -126,7 +128,9 @@ onMounted(async () => {
   const user = await loadCurrentUser()
   if (!user) {
     router.push('/login')
+    return
   }
+  await loadProfile()
   await loadAnimes()
 })
 </script>
@@ -168,7 +172,7 @@ onMounted(async () => {
             Gestión
           </button>
           
-          <button class="btn-watchlist">Mi Lista</button>
+          <button class="btn-watchlist" @click="router.push('/my-list')">Mi Lista</button>
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">

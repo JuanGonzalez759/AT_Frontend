@@ -2,12 +2,14 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useProfile } from '../composables/useProfile'
 import AnimeCard from '../components/AnimeCard.vue'
 import ContinueWatchingCard from '../components/ContinueWatchingCard.vue'
 import AnimeInfoModal from '../components/AnimeInfoModal.vue'
 
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
+const { currentProfile, loadProfile } = useProfile()
 
 // Mobile menu
 const mobileMenuOpen = ref(false)
@@ -87,9 +89,14 @@ async function loadUserProgress() {
       const data = await response.json()
       userProgress.value = data.progress || []
       console.log('User progress loaded:', userProgress.value.length, 'items')
+    } else {
+      // Si falla, simplemente no cargar progreso
+      console.debug('Could not load user progress')
+      userProgress.value = []
     }
   } catch (error) {
-    console.error('Error loading user progress:', error)
+    console.debug('Could not load user progress:', error)
+    userProgress.value = []
   }
 }
 
@@ -260,7 +267,11 @@ onMounted(async () => {
   const user = await loadCurrentUser()
   if (!user) {
     router.push('/login')
+    return
   }
+  
+  // Cargar perfil del usuario
+  await loadProfile()
   
   // Cargar progreso PRIMERO, luego animes
   await loadUserProgress()
@@ -317,7 +328,7 @@ onMounted(async () => {
 
           <!-- ...existing code... -->
           
-          <button class="btn-watchlist">Mi Lista</button>
+          <button class="btn-watchlist" @click="router.push('/my-list')">Mi Lista</button>
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
@@ -349,7 +360,7 @@ onMounted(async () => {
           <a @click="router.push('/categories'); toggleMobileMenu()" class="mobile-nav-link">Explorar</a>
           <a href="#manga" class="mobile-nav-link" @click="toggleMobileMenu">Manga</a>
           <a href="#noticias" class="mobile-nav-link" @click="toggleMobileMenu">Noticias</a>
-          <a href="#" class="mobile-nav-link" @click="toggleMobileMenu">Mi Lista</a>
+          <a @click="router.push('/my-list'); toggleMobileMenu()" class="mobile-nav-link">Mi Lista</a>
           <a v-if="currentUser?.username === 'admin'" @click="router.push('/backoffice'); toggleMobileMenu()" class="mobile-nav-link">Gestión</a>
           <a @click="goToTestWatch(); toggleMobileMenu()" class="mobile-nav-link">Reproductor</a>
         </nav>
