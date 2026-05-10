@@ -32,6 +32,7 @@ const seasons = [
   'Thriller Bark'
 ]
 const seasonSelected = ref(seasons[0])
+const showSeasonDropdown = ref(false)
 const showFullDescription = ref(false)
 
 const filteredEpisodes = computed(() => {
@@ -65,6 +66,45 @@ const showSeasons = computed(() => {
   const slug = anime.value?.anime_slug?.toLowerCase() || ''
   const title = (anime.value?.title || '').toLowerCase()
   return slug === 'one-piece' || title.includes('one piece') || anime.value?.id === 6
+})
+
+// Calculate season details with episode ranges and counts
+const seasonDetails = computed(() => {
+  if (!episodes.value || episodes.value.length === 0) return []
+  
+  const sorted = [...episodes.value].sort((a, b) => a.episode_number - b.episode_number)
+  const total = sorted.length
+  const groups = seasons.length
+  
+  if (groups <= 0) return []
+  
+  const base = Math.floor(total / groups)
+  const remainder = total % groups
+  
+  const details = []
+  let start = 0
+  
+  for (let i = 0; i < groups; i++) {
+    const size = base + (i < remainder ? 1 : 0)
+    const end = start + size
+    const seasonEpisodes = sorted.slice(start, end)
+    
+    if (seasonEpisodes.length > 0) {
+      const firstEp = seasonEpisodes[0].episode_number
+      const lastEp = seasonEpisodes[seasonEpisodes.length - 1].episode_number
+      
+      details.push({
+        name: seasons[i],
+        range: `${firstEp}-${lastEp}`,
+        count: seasonEpisodes.length,
+        episodeCount: `${seasonEpisodes.length} Episodio${seasonEpisodes.length > 1 ? 's' : ''}`
+      })
+    }
+    
+    start = end
+  }
+  
+  return details
 })
 
 // HLS.js player
@@ -338,62 +378,36 @@ async function loadEpisodeSources() {
   isYouTubeVideo.value = false
   
   try {
-    // Verificar si el episodio tiene una URL directa de video
+    // Verificar si el episodio tiene una URL directa de video (SOLO MP4, M3U8, no YouTube)
     if (currentEpisode.value.video_url) {
       const videoUrl = currentEpisode.value.video_url
       
-      // Detectar si es un video de YouTube
-      if (videoUrl.includes('youtube.com/embed') || videoUrl.includes('youtu.be') || videoUrl.includes('youtube.com/watch')) {
-        isYouTubeVideo.value = true
-        
-        let videoId = ''
-        
-        // Extraer el ID del video según el formato
-        if (videoUrl.includes('youtu.be')) {
-          videoId = videoUrl.split('youtu.be/')[1].split('?')[0]
-        } else if (videoUrl.includes('youtube.com/embed/')) {
-          videoId = videoUrl.split('youtube.com/embed/')[1].split('?')[0]
-        } else if (videoUrl.includes('youtube.com/watch')) {
-          const urlParams = new URLSearchParams(videoUrl.split('?')[1])
-          videoId = urlParams.get('v')
+      // IGNORAR videos de YouTube - solo usar archivos de video reales
+      const isYouTube = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')
+      
+      if (!isYouTube) {
+        // Si es M3U8, cargar con HLS
+        if (videoUrl.includes('.m3u8')) {
+          await setupHlsPlayer(videoUrl, {})
+          isLoadingVideo.value = false
+          return
         }
         
-        // Construir URL con parámetros para mejor experiencia
-        const params = new URLSearchParams({
-          autoplay: '1',
-          rel: '0',
-          modestbranding: '1',
-          enablejsapi: '1',
-          origin: window.location.origin
-        })
+        // Si es MP4 u otro formato, usar reproductor HTML5 nativo
+        if (videoUrl.includes('.mp4') || videoUrl.includes('.webm') || videoUrl.includes('.ogg')) {
+          await setupNativePlayer(videoUrl)
+          isLoadingVideo.value = false
+          return
+        }
         
-        youtubeEmbedUrl.value = `https://www.youtube.com/embed/${videoId}?${params.toString()}`
-        
-        isLoadingVideo.value = false
-        return
-      }
-      
-      // Si no es YouTube, verificar si es M3U8 y cargar con HLS
-      if (videoUrl.includes('.m3u8')) {
-        await setupHlsPlayer(videoUrl, {})
-        isLoadingVideo.value = false
-        return
-      }
-      
-      // Si es MP4 u otro formato, usar reproductor HTML5 nativo
-      if (videoUrl.includes('.mp4') || videoUrl.includes('.webm') || videoUrl.includes('.ogg')) {
+        // Si no coincide con ningún formato conocido, intentar como video nativo
         await setupNativePlayer(videoUrl)
         isLoadingVideo.value = false
         return
       }
-      
-      // Si no coincide con ningún formato conocido, intentar como video nativo
-      await setupNativePlayer(videoUrl)
-      isLoadingVideo.value = false
-      return
     }
     
-    // Si no hay video_url directo, usar Consumet API (flujo original)
+    // Si no hay video_url directo O es YouTube, usar Consumet API (flujo principal)
     if (!anime.value || !anime.value.anime_slug) {
       console.error('No anime slug available')
       videoError.value = 'anime_slug no configurado en la base de datos'
@@ -1186,11 +1200,45 @@ function goHome() {
       <div class="modal-content">
         <div class="modal-header">
           <h2>Episodios - {{ anime?.title }}</h2>
-          <div v-if="showSeasons" style="display:flex;align-items:center;gap:0.75rem">
-            <label style="color:rgba(255,255,255,0.8);font-weight:600">Temporada:</label>
-            <select v-model="seasonSelected" class="season-select">
-              <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
-            </select>
+          <div v-if="showSeasons" style="position:relative">
+            <label style="color:rgba(255,255,255,0.8);font-weight:600;margin-bottom:0.5rem;display:block">Temporada:</label>
+            
+            <!-- Custom Season Dropdown -->
+            <div class="custom-season-dropdown">
+              <button 
+                class="season-dropdown-trigger" 
+                @click="showSeasonDropdown = !showSeasonDropdown"
+                @blur="setTimeout(() => showSeasonDropdown = false, 200)"
+              >
+                <span>{{ seasonSelected }}</span>
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 16 16" 
+                  fill="currentColor"
+                  :style="{ transform: showSeasonDropdown ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }"
+                >
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+                </svg>
+              </button>
+              
+              <div v-if="showSeasonDropdown" class="season-dropdown-menu">
+                <div 
+                  v-for="season in seasonDetails" 
+                  :key="season.name"
+                  class="season-dropdown-item"
+                  :class="{ active: seasonSelected === season.name }"
+                  @click="seasonSelected = season.name; showSeasonDropdown = false"
+                >
+                  <div class="season-item-left">
+                    <span class="season-name">{{ season.name }} ({{ season.range }})</span>
+                  </div>
+                  <div class="season-item-right">
+                    <span class="season-count">{{ season.episodeCount }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           <button class="btn-close" @click="showAllEpisodes = false">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1577,10 +1625,12 @@ function goHome() {
   background: rgba(255, 255, 255, 0.3);
   border-radius: 2px;
   outline: none;
+  appearance: none;
   -webkit-appearance: none;
 }
 
 .volume-slider::-webkit-slider-thumb {
+  appearance: none;
   -webkit-appearance: none;
   width: 12px;
   height: 12px;
@@ -2105,26 +2155,88 @@ input:checked + .toggle-slider:before {
   font-weight: 700;
 }
 
-.season-select {
-  background: rgba(255,255,255,0.95);
-  border: 1px solid rgba(0,0,0,0.08);
-  color: #000;
-  padding: 0.18rem 0.4rem;
-  border-radius: 4px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  line-height: 1;
-  width: auto;
-  min-width: 80px;
-  max-width: 140px;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
+/* Custom Season Dropdown Styles */
+.custom-season-dropdown {
+  position: relative;
+  min-width: 280px;
 }
 
-.season-select option {
-  color: #000;
-  background: #fff;
+.season-dropdown-trigger {
+  width: 100%;
+  background: rgba(30, 30, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+}
+
+.season-dropdown-trigger:hover {
+  background: rgba(40, 40, 40, 0.95);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.season-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  background: rgba(20, 20, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.season-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.season-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.season-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.season-dropdown-item.active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.season-item-left {
+  flex: 1;
+}
+
+.season-name {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.season-item-right {
+  margin-left: 1rem;
+}
+
+.season-count {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  font-weight: 400;
 }
 
 .btn-close {

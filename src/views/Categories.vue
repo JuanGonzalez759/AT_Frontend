@@ -145,7 +145,6 @@ onMounted(async () => {
           <nav class="nav-links">
             <a @click="router.push('/home')" class="nav-link">Inicio</a>
             <a @click="router.push('/categories')" class="nav-link active">Explorar</a>
-            <a href="#manga" class="nav-link">Manga</a>
             <a href="#noticias" class="nav-link">Noticias</a>
           </nav>
         </div>

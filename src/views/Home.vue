@@ -133,7 +133,11 @@ async function loadAnimes() {
             genre: anime.genre,
             description: anime.description,
             background: anime.background_image || anime.cover_image,
+            image: anime.cover_image,
+            cover_image: anime.cover_image,
+            background_image: anime.background_image,
             rating: anime.rating,
+            audio_type: anime.audio_type,
             watched: progress.watched,
             currentEpisode: progress.current_episode,
             totalEpisodes: anime.episode_count || progress.total_episodes || 24
@@ -292,7 +296,6 @@ onMounted(async () => {
           <img src="/Logo_AniToki.png" alt="AniToki" class="logo" />
           <nav class="nav-links">
             <a @click="router.push('/categories')" class="nav-link" style="cursor: pointer;">Explorar</a>
-            <a href="#manga" class="nav-link">Manga</a>
             <a href="#noticias" class="nav-link">Noticias</a>
           </nav>
         </div>
@@ -358,7 +361,6 @@ onMounted(async () => {
         </div>
         <nav class="mobile-nav-links">
           <a @click="router.push('/categories'); toggleMobileMenu()" class="mobile-nav-link">Explorar</a>
-          <a href="#manga" class="mobile-nav-link" @click="toggleMobileMenu">Manga</a>
           <a href="#noticias" class="mobile-nav-link" @click="toggleMobileMenu">Noticias</a>
           <a @click="router.push('/my-list'); toggleMobileMenu()" class="mobile-nav-link">Mi Lista</a>
           <a v-if="currentUser?.username === 'admin'" @click="router.push('/backoffice'); toggleMobileMenu()" class="mobile-nav-link">Gestión</a>
