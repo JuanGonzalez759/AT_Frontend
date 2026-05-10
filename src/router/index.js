@@ -5,6 +5,8 @@ import Register from '../views/Register.vue'
 import Home from '../views/Home.vue'
 import Categories from '../views/Categories.vue'
 import MyList from '../views/MyList.vue'
+import Analytics from '../views/Analytics.vue'
+import AnimeDetails from '../views/AnimeDetails.vue'
 import ChooseProfile from '../views/manager/ChooseProfile.vue'
 import AdminDashboard from '../views/backoffice/AdminDashboard.vue'
 import AddAnime from '../views/backoffice/AddAnime.vue'
@@ -81,6 +83,12 @@ const routes = [
     path: '/my-list',
     name: 'MyList',
     component: MyList,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/analytics',
+    name: 'Analytics',
+    component: Analytics,
     meta: { requiresAuth: true },
   },
 ]

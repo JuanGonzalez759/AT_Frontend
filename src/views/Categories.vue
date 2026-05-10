@@ -9,6 +9,13 @@ const router = useRouter()
 const { currentUser, logout, loadCurrentUser } = useAuth()
 const { loadProfile } = useProfile()
 
+// Mobile menu
+const mobileMenuOpen = ref(false)
+
+function toggleMobileMenu() {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
 const dropdownOpen = ref(false)
 const selectedCategory = ref('all')
 const allAnimes = ref([])
@@ -137,18 +144,25 @@ onMounted(async () => {
 
 <template>
   <div class="categories-container">
-    <!-- Header -->
+    <!-- Header estilo Crunchyroll -->
     <header class="header">
       <div class="header-content">
         <div class="header-left">
-          <img src="/Logo_AniToki.png" alt="AniToki" class="logo" @click="router.push('/home')" style="cursor: pointer;" />
+          <img src="/Logo_AniToki.png" alt="AniToki" class="logo" @click="router.push('/home')" />
           <nav class="nav-links">
-            <a @click="router.push('/home')" class="nav-link">Inicio</a>
-            <a @click="router.push('/categories')" class="nav-link active">Explorar</a>
-            <a href="#noticias" class="nav-link">Noticias</a>
+            <a @click="router.push('/categories')" class="nav-link" style="cursor: pointer;">Explorar</a>
+            <a @click="router.push('/analytics')" class="nav-link" style="cursor: pointer;">Analytics</a>
           </nav>
         </div>
         <div class="header-right">
+          <!-- Hamburger menu button (mobile) -->
+          <button class="btn-hamburger" @click="toggleMobileMenu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <button class="btn-search">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"></circle>
@@ -156,7 +170,6 @@ onMounted(async () => {
             </svg>
           </button>
           
-
           <button 
             v-if="currentUser?.username === 'admin'" 
             @click="router.push('/backoffice')" 
@@ -187,6 +200,31 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
+      <!-- Mobile Navigation Menu -->
+      <div class="mobile-menu" :class="{ open: mobileMenuOpen }">
+        <div class="mobile-menu-header">
+          <img src="/Logo_AniToki.png" alt="AniToki" class="logo" />
+          <button class="btn-close" @click="toggleMobileMenu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <nav class="mobile-nav-links">
+          <a @click="router.push('/categories'); toggleMobileMenu()" class="mobile-nav-link">Explorar</a>
+          <a @click="router.push('/analytics'); toggleMobileMenu()" class="mobile-nav-link">Analytics</a>
+          <a @click="router.push('/my-list'); toggleMobileMenu()" class="mobile-nav-link">Mi Lista</a>
+          <a v-if="currentUser?.username === 'admin'" @click="router.push('/backoffice'); toggleMobileMenu()" class="mobile-nav-link">Gestión</a>
+        </nav>
+        <div class="mobile-menu-footer">
+          <button v-if="currentUser" @click="handleLogout; toggleMobileMenu()" class="btn-logout-mobile">
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+      <div v-if="mobileMenuOpen" class="mobile-menu-overlay" @click="toggleMobileMenu"></div>
     </header>
 
     <!-- Hero Section -->
@@ -362,21 +400,22 @@ onMounted(async () => {
   color: #fff;
 }
 
-/* Header */
+/* ===== HEADER ===== */
 .header {
-  background: rgba(10, 10, 10, 0.95);
-  padding: 1rem 0;
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  left: 0;
+  right: 0;
+  background: rgba(10, 10, 10, 0.98);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .header-content {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 1rem 2.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -385,47 +424,48 @@ onMounted(async () => {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 3rem;
 }
 
 .logo {
-  height: 50px;
+  height: 45px;
   width: auto;
   object-fit: contain;
+  cursor: pointer;
 }
 
 .nav-links {
   display: flex;
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
 .nav-link {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--color-text-primary);
   text-decoration: none;
-  font-weight: 600;
   font-size: 0.95rem;
-  transition: color 0.3s;
-  cursor: pointer;
+  font-weight: 500;
+  transition: color 0.2s ease;
   position: relative;
-  padding: 0.5rem 0;
 }
 
 .nav-link:hover {
-  color: #fff;
+  color: var(--color-primary-light);
 }
 
-.nav-link.active {
-  color: #a855f7;
-}
-
-.nav-link.active::after {
+.nav-link::after {
   content: '';
   position: absolute;
-  bottom: 0;
+  bottom: -8px;
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, #a855f7, #9333ea);
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+
+.nav-link:hover::after {
+  transform: scaleX(1);
 }
 
 .header-right {
@@ -434,39 +474,61 @@ onMounted(async () => {
   gap: 1rem;
 }
 
-.btn-search,
-.btn-admin,
-.btn-watchlist {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
+.btn-search {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--color-text-primary);
+  padding: 0.6rem;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-.btn-search {
-  width: 40px;
-  height: 40px;
-  padding: 0;
   justify-content: center;
 }
 
-.btn-admin,
-.btn-watchlist {
-  font-size: 0.9rem;
+.btn-search:hover {
+  background: rgba(147, 51, 234, 0.1);
+  border-color: var(--color-primary);
 }
 
-.btn-search:hover,
-.btn-admin:hover,
+.btn-watchlist {
+  background: transparent;
+  border: 1.5px solid var(--color-primary);
+  color: var(--color-primary);
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
 .btn-watchlist:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(168, 85, 247, 0.5);
+  background: var(--color-primary);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
+}
+
+.btn-admin {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border: none;
+  color: #fff;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.btn-admin:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
 }
 
 .user-controls {
@@ -476,41 +538,165 @@ onMounted(async () => {
 }
 
 .btn-profile {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: #fff;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  cursor: pointer;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #a855f7, #9333ea);
-  border: 2px solid rgba(168, 85, 247, 0.3);
-  color: #fff;
-  font-weight: 700;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: all 0.3s ease;
 }
 
 .btn-profile:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.5);
+  transform: scale(1.1);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
 }
 
 .btn-logout {
   background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--color-text-primary);
+  padding: 0.6rem;
+  border-radius: 6px;
   cursor: pointer;
-  padding: 0.5rem;
-  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
 }
 
 .btn-logout:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
   color: #ef4444;
+}
+
+.btn-hamburger {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.btn-hamburger:hover {
+  color: var(--color-primary-light);
+}
+
+/* Mobile Menu */
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 300px;
+  height: 100vh;
+  background: rgba(10, 10, 10, 0.98);
+  backdrop-filter: blur(20px);
+  z-index: 1001;
+  transition: right 0.4s ease;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobile-menu.open {
+  right: 0;
+}
+
+.mobile-menu-header {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobile-menu-header .logo {
+  height: 35px;
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.btn-close:hover {
+  color: #ef4444;
+}
+
+.mobile-nav-links {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0;
+}
+
+.mobile-nav-link {
+  color: var(--color-text-primary);
+  text-decoration: none;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.mobile-nav-link:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: var(--color-primary);
+  color: var(--color-primary-light);
+}
+
+.mobile-menu-footer {
+  padding: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-logout-mobile {
+  width: 100%;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-logout-mobile:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+.mobile-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  cursor: pointer;
 }
 
 /* Hero Section */
 .hero-section {
+  margin-top: 72px; /* Altura del header fijo */
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(147, 51, 234, 0.1));
   padding: 4rem 2rem 3rem;
   text-align: center;
@@ -764,12 +950,25 @@ onMounted(async () => {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .header-left {
-    gap: 1rem;
-  }
-
   .nav-links {
     display: none;
+  }
+
+  .btn-hamburger {
+    display: block;
+  }
+
+  .btn-watchlist,
+  .btn-admin {
+    display: none;
+  }
+
+  .header-content {
+    padding: 1rem 1.5rem;
+  }
+
+  .header-left {
+    gap: 1rem;
   }
 
   .hero-title {

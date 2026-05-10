@@ -296,7 +296,7 @@ onMounted(async () => {
           <img src="/Logo_AniToki.png" alt="AniToki" class="logo" />
           <nav class="nav-links">
             <a @click="router.push('/categories')" class="nav-link" style="cursor: pointer;">Explorar</a>
-            <a href="#noticias" class="nav-link">Noticias</a>
+            <a @click="router.push('/analytics')" class="nav-link" style="cursor: pointer;">Analytics</a>
           </nav>
         </div>
         <div class="header-right">
@@ -361,7 +361,7 @@ onMounted(async () => {
         </div>
         <nav class="mobile-nav-links">
           <a @click="router.push('/categories'); toggleMobileMenu()" class="mobile-nav-link">Explorar</a>
-          <a href="#noticias" class="mobile-nav-link" @click="toggleMobileMenu">Noticias</a>
+          <a @click="router.push('/analytics'); toggleMobileMenu()" class="mobile-nav-link">Analytics</a>
           <a @click="router.push('/my-list'); toggleMobileMenu()" class="mobile-nav-link">Mi Lista</a>
           <a v-if="currentUser?.username === 'admin'" @click="router.push('/backoffice'); toggleMobileMenu()" class="mobile-nav-link">Gestión</a>
           <a @click="goToTestWatch(); toggleMobileMenu()" class="mobile-nav-link">Reproductor</a>
