@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import AnimeCard from '../components/AnimeCard.vue'
 import ContinueWatchingCard from '../components/ContinueWatchingCard.vue'
+import AnimeInfoModal from '../components/AnimeInfoModal.vue'
 
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
@@ -235,6 +236,26 @@ function goToTestWatch() {
   })
 }
 
+// Modal de información
+const modalVisible = ref(false)
+const modalAnime = ref({})
+
+function openModal(anime) {
+  modalAnime.value = anime || {}
+  modalVisible.value = true
+}
+
+function closeModal() {
+  modalVisible.value = false
+  modalAnime.value = {}
+}
+
+function onWatchFromModal(anime) {
+  const id = anime.id || anime.animeId || anime.anime_id
+  if (id) router.push(`/watch?anime=${id}`)
+  closeModal()
+}
+
 onMounted(async () => {
   const user = await loadCurrentUser()
   if (!user) {
@@ -383,7 +404,7 @@ onMounted(async () => {
                 </svg>
                 {{ getWatchButtonText(anime) }}
               </button>
-              <button class="btn-hero-info">
+              <button class="btn-hero-info" @click="openModal(anime)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"></circle>
                   <path d="M12 16v-4"></path>
@@ -432,6 +453,7 @@ onMounted(async () => {
               v-for="item in continueWatching"
               :key="item.animeId"
               v-bind="item"
+              @show-info="openModal"
             />
           </div>
           <button 
@@ -457,6 +479,7 @@ onMounted(async () => {
               v-for="item in newThisSeason"
               :key="item.animeId"
               v-bind="item"
+              @show-info="openModal"
             />
           </div>
           <button 
@@ -482,6 +505,7 @@ onMounted(async () => {
               v-for="item in simulcasts"
               :key="item.animeId"
               v-bind="item"
+              @show-info="openModal"
             />
           </div>
           <button 
@@ -507,6 +531,7 @@ onMounted(async () => {
               v-for="item in popularNow"
               :key="item.animeId"
               v-bind="item"
+              @show-info="openModal"
             />
           </div>
           <button 
@@ -532,6 +557,7 @@ onMounted(async () => {
               v-for="item in actionAnimes"
               :key="item.animeId"
               v-bind="item"
+              @show-info="openModal"
             />
           </div>
           <button 
@@ -557,6 +583,7 @@ onMounted(async () => {
               v-for="item in romanceAnimes"
               :key="item.animeId"
               v-bind="item"
+              @show-info="openModal"
             />
           </div>
           <button 
@@ -582,6 +609,7 @@ onMounted(async () => {
               v-for="item in comedyAnimes"
               :key="item.animeId"
               v-bind="item"
+              @show-info="openModal"
             />
           </div>
           <button 
@@ -592,6 +620,13 @@ onMounted(async () => {
       </section>
 
     </main>
+
+    <AnimeInfoModal
+      :show="modalVisible"
+      :anime="modalAnime"
+      @close="closeModal"
+      @watch="onWatchFromModal"
+    />
 
     <!-- Footer -->
     <footer class="footer">

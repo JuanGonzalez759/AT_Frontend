@@ -36,6 +36,7 @@ const props = defineProps({
 
 const router = useRouter()
 const { authenticatedFetch } = useAuth()
+const emit = defineEmits(['show-info'])
 const isHovered = ref(false)
 const isSaved = ref(false)
 
@@ -43,6 +44,21 @@ function handleClick() {
   if (props.animeId) {
     router.push(`/watch?anime=${props.animeId}`)
   }
+}
+
+function emitShowInfo() {
+  const payload = {
+    id: props.animeId,
+    title: props.title,
+    subtitle: props.subtitle,
+    image: props.image,
+    genre: props.genre,
+    rating: props.rating,
+    episodeCount: props.episodeCount,
+    audioType: props.audioType,
+    contentType: props.contentType
+  }
+  emit('show-info', payload)
 }
 
 async function toggleSave(event) {
@@ -178,6 +194,14 @@ onMounted(() => {
                 <path d="M8 5v14l11-7z"/>
               </svg>
               Ver Ahora
+            </button>
+            <button class="btn-info" @click.stop="emitShowInfo">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 16v-4"></path>
+                <path d="M12 8h.01"></path>
+              </svg>
+              Más info
             </button>
           </div>
         </div>
@@ -477,6 +501,21 @@ onMounted(() => {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
 }
+
+.btn-info {
+  margin-left: 8px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-info svg { display: block; }
 
 /* Botón de guardar */
 .save-button {

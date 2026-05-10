@@ -27,6 +27,7 @@ const props = defineProps({
 
 const router = useRouter()
 const isHovered = ref(false)
+const emit = defineEmits(['show-info'])
 
 // Calcular tiempo restante
 const timeRemaining = ref(`${props.duration} restantes`)
@@ -35,6 +36,18 @@ function handleClick() {
   if (props.animeId) {
     router.push(`/watch?anime=${props.animeId}`)
   }
+}
+
+function emitShowInfo(event) {
+  const payload = {
+    id: props.animeId,
+    title: props.title,
+    image: props.thumbnail,
+    episodeNumber: props.episodeNumber,
+    progress: props.progress,
+    audioType: props.audioType
+  }
+  emit('show-info', payload)
 }
 </script>
 
@@ -66,6 +79,15 @@ function handleClick() {
       
       <!-- Badge de audio (SUB/DUB) -->
       <div class="audio-badge">{{ audioType }}</div>
+
+      <!-- Botón Más info -->
+      <button class="info-button" @click.stop="emitShowInfo" :title="'Más info'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 16v-4"></path>
+          <path d="M12 8h.01"></path>
+        </svg>
+      </button>
       
       <!-- Duración restante -->
       <div class="time-remaining">{{ timeRemaining }}</div>
@@ -185,6 +207,21 @@ function handleClick() {
   letter-spacing: 0.5px;
   z-index: 3;
 }
+
+.info-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.6);
+  border: none;
+  color: #fff;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 4;
+}
+
+.info-button svg { display: block; }
 
 .time-remaining {
   position: absolute;
