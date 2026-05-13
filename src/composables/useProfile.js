@@ -1,6 +1,8 @@
 import { ref } from 'vue'
+import { useAuth } from './useAuth'
 
 const currentProfile = ref(null)
+const { API_BASE_URL } = useAuth()
 
 // Helper functions
 function getCookie(name) {
@@ -13,7 +15,7 @@ function getCookie(name) {
 }
 
 async function setCsrfCookie() {
-  await fetch('/api/csrf/', {
+  await fetch(`${API_BASE_URL}/api/csrf/`, {
     credentials: 'include',
   })
 }
@@ -29,7 +31,7 @@ export function useProfile() {
 
     try {
       // Primero verificar que el perfil existe
-      const response = await fetch(`/api/manager/profiles/${profileId}/`, {
+      const response = await fetch(`${API_BASE_URL}/api/manager/profiles/${profileId}/`, {
         credentials: 'include'
       })
 
@@ -40,7 +42,7 @@ export function useProfile() {
         await setCsrfCookie()
         const csrfToken = getCookie('csrftoken')
         
-        await fetch('/api/manager/profiles/select/', {
+        await fetch(`${API_BASE_URL}/api/manager/profiles/select/`, {
           method: 'POST',
           credentials: 'include',
           headers: {
@@ -72,7 +74,7 @@ export function useProfile() {
       await setCsrfCookie()
       const csrfToken = getCookie('csrftoken')
       
-      const response = await fetch('/api/manager/profiles/select/', {
+      const response = await fetch(`${API_BASE_URL}/api/manager/profiles/select/`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -111,7 +113,7 @@ export function useProfile() {
 
   async function fetchProfiles() {
     try {
-      const response = await fetch('/api/manager/profiles/', {
+      const response = await fetch(`${API_BASE_URL}/api/manager/profiles/`, {
         credentials: 'include'
       })
 

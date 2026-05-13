@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuth } from '../../composables/useAuth'
 
 const router = useRouter()
 const route = useRoute()
+const { API_BASE_URL } = useAuth()
 
 const animeForm = ref({
   title: '',
@@ -29,7 +31,7 @@ function getCookie(name) {
 }
 
 async function setCsrfCookie() {
-  await fetch('/api/csrf/', {
+  await fetch(`${API_BASE_URL}/api/csrf/`, {
     credentials: 'include',
   })
 }
@@ -41,7 +43,7 @@ onMounted(async () => {
 async function loadAnime() {
   isLoading.value = true
   try {
-    const response = await fetch(`/api/backoffice/animes/${route.params.id}/`, {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/${route.params.id}/`, {
       credentials: 'include'
     })
 
@@ -81,7 +83,7 @@ async function saveAnime() {
     await setCsrfCookie()
     const csrfToken = getCookie('csrftoken')
     
-    const response = await fetch(`/api/backoffice/animes/${route.params.id}/`, {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/${route.params.id}/`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

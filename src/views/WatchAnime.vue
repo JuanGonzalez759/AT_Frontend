@@ -7,7 +7,7 @@ import Hls from 'hls.js'
 
 const router = useRouter()
 const route = useRoute()
-const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
+const { currentUser, logout, loadCurrentUser, authenticatedFetch, API_BASE_URL } = useAuth()
 const { currentProfile, loadProfile } = useProfile()
 
 const animeId = ref(route.query.anime)
@@ -321,7 +321,7 @@ async function loadAnime() {
   if (!animeId.value) return
   
   try {
-    const response = await fetch(`/api/backoffice/public/animes/${animeId.value}/`, {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/public/animes/${animeId.value}/`, {
       credentials: 'include'
     })
     if (response.ok) {
@@ -352,7 +352,7 @@ async function loadEpisodeData() {
   
   isLoading.value = true
   try {
-    const response = await fetch(`/api/backoffice/episodes/?anime_id=${animeId.value}`, {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/?anime_id=${animeId.value}`, {
       credentials: 'include'
     })
     if (response.ok) {

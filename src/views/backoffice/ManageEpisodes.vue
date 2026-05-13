@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuth } from '../../composables/useAuth'
 
 const router = useRouter()
 const route = useRoute()
+const { API_BASE_URL } = useAuth()
 
 const animeId = ref(route.params.id)
 const anime = ref(null)
@@ -42,7 +44,7 @@ function getCookie(name) {
 }
 
 async function setCsrfCookie() {
-  await fetch('/api/csrf/', {
+  await fetch(`${API_BASE_URL}/api/csrf/`, {
     credentials: 'include',
   })
 }
@@ -54,7 +56,7 @@ onMounted(async () => {
 
 async function loadAnime() {
   try {
-    const response = await fetch(`/api/backoffice/animes/${animeId.value}/`, {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/${animeId.value}/`, {
       credentials: 'include'
     })
     if (response.ok) {
@@ -68,7 +70,7 @@ async function loadAnime() {
 async function loadEpisodes() {
   isLoading.value = true
   try {
-    const response = await fetch(`/api/backoffice/episodes/?anime_id=${animeId.value}`, {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/?anime_id=${animeId.value}`, {
       credentials: 'include'
     })
     if (response.ok) {
@@ -94,7 +96,7 @@ async function saveEpisode() {
     await setCsrfCookie()
     const csrfToken = getCookie('csrftoken')
     
-    const response = await fetch('/api/backoffice/episodes/', {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -153,7 +155,7 @@ async function confirmDelete() {
     await setCsrfCookie()
     const csrfToken = getCookie('csrftoken')
     
-    const response = await fetch(`/api/backoffice/episodes/${episodeToDelete.value.id}/`, {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/${episodeToDelete.value.id}/`, {
       method: 'DELETE',
       headers: {
         'X-CSRFToken': csrfToken,
@@ -214,7 +216,7 @@ async function saveEdit() {
     await setCsrfCookie()
     const csrfToken = getCookie('csrftoken')
     
-    const response = await fetch(`/api/backoffice/episodes/${episodeToEdit.value.id}/`, {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/${episodeToEdit.value.id}/`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

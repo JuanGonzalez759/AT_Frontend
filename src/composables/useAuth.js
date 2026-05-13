@@ -118,6 +118,9 @@ export function useAuth() {
   async function authenticatedFetch(url, options = {}) {
     const { headers: optionsHeaders, ...restOptions } = options
     
+    // Agregar API_BASE_URL si la URL es relativa
+    const fullUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url
+    
     const mergedHeaders = {
       ...getAuthHeaders(),
       ...optionsHeaders,
@@ -128,7 +131,7 @@ export function useAuth() {
       ...restOptions
     }
     
-    return fetch(url, finalOptions)
+    return fetch(fullUrl, finalOptions)
   }
 
   return {
@@ -138,5 +141,6 @@ export function useAuth() {
     login,
     logout,
     authenticatedFetch,
+    API_BASE_URL,
   }
 }

@@ -8,7 +8,7 @@ import ContinueWatchingCard from '../components/ContinueWatchingCard.vue'
 import AnimeInfoModal from '../components/AnimeInfoModal.vue'
 
 const router = useRouter()
-const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
+const { currentUser, logout, loadCurrentUser, authenticatedFetch, API_BASE_URL } = useAuth()
 const { currentProfile, loadProfile } = useProfile()
 
 // Mobile menu
@@ -159,7 +159,7 @@ function getAnimeProgress(animeId) {
 
 async function loadAnimes() {
   try {
-    const response = await fetch('/api/backoffice/public/animes/?page_size=100', {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/public/animes/?page_size=100`, {
       credentials: 'include'
     })
     if (response.ok) {

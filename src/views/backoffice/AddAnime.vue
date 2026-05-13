@@ -1,8 +1,10 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '../../composables/useAuth'
 
 const router = useRouter()
+const { API_BASE_URL } = useAuth()
 
 const animeForm = ref({
   title: '',
@@ -51,7 +53,7 @@ function getCookie(name) {
 }
 
 async function setCsrfCookie() {
-  await fetch('/api/csrf/', {
+  await fetch(`${API_BASE_URL}/api/csrf/`, {
     credentials: 'include',
   })
 }
@@ -75,7 +77,7 @@ function searchJikan() {
   searchTimeout = setTimeout(async () => {
     isSearching.value = true
     try {
-      const response = await fetch(`/api/backoffice/jikan/search/?q=${encodeURIComponent(query)}`, {
+      const response = await fetch(`${API_BASE_URL}/api/backoffice/jikan/search/?q=${encodeURIComponent(query)}`, {
         credentials: 'include'
       })
       
@@ -138,7 +140,7 @@ async function saveAnime() {
     await setCsrfCookie()
     const csrfToken = getCookie('csrftoken')
     
-    const response = await fetch('/api/backoffice/animes/', {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

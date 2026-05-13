@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 
 const router = useRouter()
-const { user, logout } = useAuth()
+const { user, logout, API_BASE_URL } = useAuth()
 
 const adminProfile = ref({
   name: 'Admin',
@@ -26,7 +26,7 @@ onActivated(() => {
 
 async function loadAnimes() {
   try {
-    const response = await fetch('/api/backoffice/animes/?page_size=100', {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/?page_size=100`, {
       credentials: 'include'
     })
     if (response.ok) {
@@ -80,7 +80,7 @@ async function confirmDelete() {
 
   try {
     const csrfToken = getCookie('csrftoken')
-    const response = await fetch(`/api/backoffice/animes/${animeToDelete.value.id}/`, {
+    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/${animeToDelete.value.id}/`, {
       method: 'DELETE',
       credentials: 'include',
       headers: {
