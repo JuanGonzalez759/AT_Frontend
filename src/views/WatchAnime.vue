@@ -713,11 +713,14 @@ function toggleSave() {
 }
 
 async function addToWatchlist() {
+  if (!currentProfile.value) return
+  
   try {
     const response = await authenticatedFetch('/api/manager/watchlist/', {
       method: 'POST',
       body: JSON.stringify({
-        anime_id: anime.value.id
+        anime_id: anime.value.id,
+        profile_id: currentProfile.value.id
       })
     })
     
@@ -732,8 +735,10 @@ async function addToWatchlist() {
 }
 
 async function removeFromWatchlist() {
+  if (!currentProfile.value) return
+  
   try {
-    const response = await authenticatedFetch(`/api/manager/watchlist/remove/${anime.value.id}/`, {
+    const response = await authenticatedFetch(`/api/manager/watchlist/remove/${anime.value.id}/?profile_id=${currentProfile.value.id}`, {
       method: 'DELETE'
     })
     
@@ -748,10 +753,10 @@ async function removeFromWatchlist() {
 }
 
 async function checkIfInWatchlist() {
-  if (!anime.value) return
+  if (!anime.value || !currentProfile.value) return
   
   try {
-    const response = await authenticatedFetch('/api/manager/watchlist/')
+    const response = await authenticatedFetch(`/api/manager/watchlist/?profile_id=${currentProfile.value.id}`)
     if (response.ok) {
       const data = await response.json()
       saved.value = data.some(item => item.anime.id === anime.value.id)
