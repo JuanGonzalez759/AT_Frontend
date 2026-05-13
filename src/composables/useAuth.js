@@ -3,25 +3,43 @@ import { ref } from 'vue'
 const currentUser = ref(null)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
-function getCookie(name) {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) {
-    return parts.pop().split(';').shift()
-  }
-  return ''
+// Funciones para manejar tokens en localStorage
+function getAccessToken() {
+  return localStorage.getItem('access_token')
 }
 
-async function setCsrfCookie() {
-  await fetch(`${API_BASE_URL}/api/csrf/`, {
-    credentials: 'include',
-  })
+function getRefreshToken() {
+  return localStorage.getItem('refresh_token')
+}
+
+function setTokens(access, refresh) {
+  localStorage.setItem('access_token', access)
+  localStorage.setItem('refresh_token', refresh)
+}
+
+function clearTokens() {
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+}
+
+// Headers con autenticación
+function getAuthHeaders() {
+  const token = getAccessToken()
+  const headers = {
+    'Content-Type': 'application/json',
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return headers
 }
 
 export function useAuth() {
   async function loadCurrentUser() {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/user/`, { credentials: 'include' })
+      const response = await fetch(`${API_BASE_URL}/api/auth/user/`, {
+        headers: getAuthHeaders(),
+      })
       if (!response.ok) {
         currentUser.value = null
         return null
@@ -36,15 +54,10 @@ export function useAuth() {
   }
 
   async function register(username, email, password) {
-    await setCsrfCookie()
-    const csrfToken = getCookie('csrftoken')
-    
     const response = await fetch(`${API_BASE_URL}/api/auth/register/`, {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
       },
       body: JSON.stringify({ username, email, password }),
     })
@@ -55,20 +68,19 @@ export function useAuth() {
     }
 
     const data = await response.json()
+    
+    // Guardar tokens
+    setTokens(data.access, data.refresh)
+    
     currentUser.value = data.user
     return data
   }
 
   async function login(username, password) {
-    await setCsrfCookie()
-    const csrfToken = getCookie('csrftoken')
-    
     const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
       },
       body: JSON.stringify({ username, password }),
     })
@@ -79,55 +91,39 @@ export function useAuth() {
     }
 
     const data = await response.json()
+    
+    // Guardar tokens
+    setTokens(data.access, data.refresh)
+    
     currentUser.value = data.user
     return data.user
   }
 
   async function logout() {
     try {
-      await setCsrfCookie()
-      const csrfToken = getCookie('csrftoken')
-      
-      const response = await fetch('/api/auth/logout/', {
+      await fetch(`${API_BASE_URL}/api/auth/logout/`, {
         method: 'POST',
-        credentials: 'include',
-        headers: {
-          'X-CSRFToken': csrfToken,
-        },
+        headers: getAuthHeaders(),
       })
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({ detail: 'Error al cerrar sesión' }))
-        throw new Error(data.detail || 'Error al cerrar sesión')
-      }
-
-      const data = await response.json()
-      return data
     } catch (error) {
-      // Incluso si hay un error, limpiamos el usuario localmente
-      throw error
+      console.error('Error al cerrar sesión:', error)
     } finally {
-      // Siempre limpiar el usuario, incluso si hay error en el servidor
+      // Siempre limpiar tokens y usuario
+      clearTokens()
       currentUser.value = null
     }
   }
 
-  // Helper para hacer requests autenticados con CSRF
+  // Helper para hacer requests autenticados con token JWT
   async function authenticatedFetch(url, options = {}) {
-    await setCsrfCookie()
-    const csrfToken = getCookie('csrftoken')
-    
-    // Separar headers de otras opciones para evitar sobrescritura
     const { headers: optionsHeaders, ...restOptions } = options
     
     const mergedHeaders = {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': csrfToken,
+      ...getAuthHeaders(),
       ...optionsHeaders,
     }
     
     const finalOptions = {
-      credentials: 'include',
       headers: mergedHeaders,
       ...restOptions
     }
@@ -141,8 +137,6 @@ export function useAuth() {
     register,
     login,
     logout,
-    getCookie,
-    setCsrfCookie,
     authenticatedFetch,
   }
 }
