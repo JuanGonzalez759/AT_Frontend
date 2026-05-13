@@ -62,7 +62,6 @@ async function loadProfiles() {
     const response = await authenticatedFetch('/api/manager/profiles/')
     if (response.ok) {
       profiles.value = await response.json()
-      console.log('Perfiles cargados:', profiles.value.length)
     }
   } catch (error) {
     console.error('Error loading profiles:', error)
@@ -75,7 +74,6 @@ async function handleSelectProfile(profile) {
   if (isEditing.value) return
   
   try {
-    console.log('Perfil seleccionado:', profile.name)
     await selectProfileComposable(profile.id, true)
     router.push('/home')
   } catch (error) {

@@ -726,8 +726,6 @@ async function addToWatchlist() {
     
     if (response.ok) {
       saved.value = true
-      const data = await response.json()
-      console.log(data.message)
     }
   } catch (error) {
     console.error('Error adding to watchlist:', error)
@@ -744,8 +742,6 @@ async function removeFromWatchlist() {
     
     if (response.ok) {
       saved.value = false
-      const data = await response.json()
-      console.log(data.message)
     }
   } catch (error) {
     console.error('Error removing from watchlist:', error)

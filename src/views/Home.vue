@@ -135,7 +135,6 @@ async function loadUserProgress() {
     if (response.ok) {
       const data = await response.json()
       userProgress.value = data.progress || []
-      console.log('User progress loaded:', userProgress.value.length, 'items')
     } else {
       // Si falla, simplemente no cargar progreso
       console.debug('Could not load user progress')
