@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useProfile } from '../composables/useProfile'
@@ -56,6 +56,15 @@ async function handleLogout() {
     console.error('Error al cerrar sesión:', error)
   }
 }
+
+// Recargar watchlist cuando cambia el perfil
+watch(() => currentProfile.value?.id, async (newProfileId, oldProfileId) => {
+  if (newProfileId && oldProfileId && newProfileId !== oldProfileId) {
+    // El perfil cambió, recargar watchlist
+    clearCache()
+    await loadWatchlist()
+  }
+})
 
 onMounted(async () => {
   const user = await loadCurrentUser()
@@ -114,7 +123,7 @@ onMounted(async () => {
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <img v-if="currentProfile" :src="currentProfile.avatar" alt="Profile" class="profile-avatar" />
+              <img v-if="currentProfile?.avatar" :src="currentProfile.avatar" :alt="currentProfile.name" class="profile-avatar" />
               <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
             <button class="btn-logout" @click="handleLogout">

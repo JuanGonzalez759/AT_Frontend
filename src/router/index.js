@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
+import RecuperarContraseña from '../views/RecuperarContraseña.vue'
+import ResetPassword from '../views/ResetPassword.vue'
 import Home from '../views/Home.vue'
 import Categories from '../views/Categories.vue'
 import MyList from '../views/MyList.vue'
@@ -29,6 +31,18 @@ const routes = [
     path: '/register',
     name: 'Register',
     component: Register,
+    meta: { requiresGuest: true },
+  },
+  {
+    path: '/recuperar-contraseña',
+    name: 'RecuperarContraseña',
+    component: RecuperarContraseña,
+    meta: { requiresGuest: true },
+  },
+  {
+    path: '/reset-password',
+    name: 'ResetPassword',
+    component: ResetPassword,
     meta: { requiresGuest: true },
   },
   {
@@ -89,6 +103,12 @@ const routes = [
     path: '/analytics',
     name: 'Analytics',
     component: Analytics,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/anime/:id',
+    name: 'AnimeDetails',
+    component: AnimeDetails,
     meta: { requiresAuth: true },
   },
 ]

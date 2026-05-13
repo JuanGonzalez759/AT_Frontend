@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useProfile } from '../composables/useProfile'
@@ -16,6 +16,53 @@ const mobileMenuOpen = ref(false)
 
 function toggleMobileMenu() {
   mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+// Search functionality
+const searchOpen = ref(false)
+const searchQuery = ref('')
+const searchResults = ref([])
+const isSearching = ref(false)
+
+function toggleSearch() {
+  searchOpen.value = !searchOpen.value
+  if (searchOpen.value) {
+    // Focus input after animation
+    setTimeout(() => {
+      document.querySelector('.search-input')?.focus()
+    }, 300)
+  } else {
+    searchQuery.value = ''
+    searchResults.value = []
+  }
+}
+
+async function performSearch() {
+  if (!searchQuery.value.trim()) {
+    searchResults.value = []
+    return
+  }
+  
+  isSearching.value = true
+  try {
+    const response = await authenticatedFetch(`/api/backoffice/public/animes/?search=${encodeURIComponent(searchQuery.value)}`)
+    if (response.ok) {
+      const data = await response.json()
+      searchResults.value = data.results?.slice(0, 10) || [] // Máximo 10 resultados
+    }
+  } catch (error) {
+    console.error('Error searching:', error)
+    searchResults.value = []
+  } finally {
+    isSearching.value = false
+  }
+}
+
+function goToAnime(animeId) {
+  router.push(`/anime/${animeId}`)
+  searchOpen.value = false
+  searchQuery.value = ''
+  searchResults.value = []
 }
 
 // Hero carousel data
@@ -263,9 +310,18 @@ function closeModal() {
 
 function onWatchFromModal(anime) {
   const id = anime.id || anime.animeId || anime.anime_id
-  if (id) router.push(`/watch?anime=${id}`)
+  if (id) router.push(`/anime/${id}`)
   closeModal()
 }
+
+// Recargar datos cuando cambia el perfil
+watch(() => currentProfile.value?.id, async (newProfileId, oldProfileId) => {
+  if (newProfileId && oldProfileId && newProfileId !== oldProfileId) {
+    // El perfil cambió, recargar progreso y animes
+    await loadUserProgress()
+    await loadAnimes()
+  }
+})
 
 onMounted(async () => {
   const user = await loadCurrentUser()
@@ -308,7 +364,7 @@ onMounted(async () => {
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <button class="btn-search">
+          <button class="btn-search" @click="toggleSearch">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"></circle>
               <path d="m21 21-4.35-4.35"></path>
@@ -335,7 +391,8 @@ onMounted(async () => {
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+              <img v-if="currentProfile?.avatar" :src="currentProfile.avatar" :alt="currentProfile.name" class="profile-avatar" />
+              <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
             <button class="btn-logout" @click="handleLogout">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -375,6 +432,62 @@ onMounted(async () => {
       <div v-if="mobileMenuOpen" class="mobile-menu-overlay" @click="toggleMobileMenu"></div>
     </header>
 
+    <!-- Search Overlay -->
+    <div class="search-container" :class="{ 'search-open': searchOpen }">
+      <div class="search-bar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.35-4.35"></path>
+        </svg>
+        <input 
+          type="text" 
+          v-model="searchQuery"
+          @input="performSearch"
+          class="search-input" 
+          placeholder="Buscar animes..."
+        />
+        <button class="search-close" @click="toggleSearch">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Search Results Dropdown -->
+      <div class="search-results" v-if="searchQuery.trim()">
+        <div v-if="isSearching" class="search-loading">
+          <div class="spinner"></div>
+          Buscando...
+        </div>
+        
+        <div v-else-if="searchResults.length === 0" class="search-empty">
+          No se encontraron resultados para "{{ searchQuery }}"
+        </div>
+        
+        <div v-else class="search-list">
+          <div 
+            v-for="anime in searchResults" 
+            :key="anime.id"
+            class="search-item"
+            @click="goToAnime(anime.id)"
+          >
+            <img :src="anime.cover_image" :alt="anime.title" class="search-item-image" />
+            <div class="search-item-info">
+              <h4 class="search-item-title">{{ anime.title }}</h4>
+              <div class="search-item-meta">
+                <span>{{ anime.year }}</span>
+                <span>⭐ {{ anime.rating }}/10</span>
+                <span>{{ anime.episode_count }} eps</span>
+              </div>
+              <p class="search-item-genre">{{ anime.genre }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="searchOpen" class="search-backdrop" @click="toggleSearch"></div>
+
     <!-- Hero Banner Carousel -->
     <section 
       class="hero-banner" 
@@ -411,7 +524,7 @@ onMounted(async () => {
             </div>
             <p class="hero-description">{{ anime.description }}</p>
             <div class="hero-actions">
-              <button class="btn-hero-play" @click="router.push(`/watch?anime=${anime.id}`)">
+              <button class="btn-hero-play" @click="router.push(`/anime/${anime.id}`)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M8 5v14l11-7z"/>
                 </svg>
@@ -854,6 +967,13 @@ onMounted(async () => {
   transform: scale(1.1);
   border-color: rgba(255, 255, 255, 0.4);
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
+}
+
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .btn-logout {
@@ -1366,6 +1486,189 @@ onMounted(async () => {
   z-index: 999;
 }
 
+/* Search Container */
+.search-container {
+  position: fixed;
+  top: 0;
+  right: -600px;
+  width: 550px;
+  max-width: 90vw;
+  height: 100vh;
+  background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+  z-index: 1001;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(147, 51, 234, 0.2);
+}
+
+.search-container.search-open {
+  right: 0;
+}
+
+.search-bar {
+  padding: 1.5rem;
+  background: rgba(20, 20, 20, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  backdrop-filter: blur(10px);
+}
+
+.search-icon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-text-primary);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.search-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.search-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-primary);
+}
+
+.search-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.search-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(147, 51, 234, 0.2);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.search-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.95rem;
+}
+
+.search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.search-item {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.search-item:hover {
+  background: rgba(147, 51, 234, 0.1);
+  border-color: var(--color-primary);
+  transform: translateX(-4px);
+}
+
+.search-item-image {
+  width: 80px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.search-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.search-item-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.search-item-meta {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.search-item-genre {
+  font-size: 0.85rem;
+  color: var(--color-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .btn-test-watch,
@@ -1387,10 +1690,31 @@ onMounted(async () => {
     display: none;
   }
 
-  .header-right .btn-search,
   .header-right .btn-watchlist,
   .header-right .user-controls {
     display: none;
+  }
+
+  .header-right .btn-search {
+    display: flex;
+  }
+
+  .search-container {
+    width: 100vw;
+  }
+
+  .search-item-image {
+    width: 60px;
+    height: 85px;
+  }
+
+  .search-item-title {
+    font-size: 0.9rem;
+  }
+
+  .search-item-meta {
+    font-size: 0.75rem;
+    flex-wrap: wrap;
   }
   
   .hero-title {

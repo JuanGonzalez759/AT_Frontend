@@ -44,7 +44,7 @@ const isSaved = ref(false)
 
 function handleClick() {
   if (props.animeId) {
-    router.push(`/watch?anime=${props.animeId}`)
+    router.push(`/anime/${props.animeId}`)
   }
 }
 

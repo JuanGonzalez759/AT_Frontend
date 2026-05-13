@@ -127,7 +127,7 @@ onMounted(() => {
         </div>
 
         <div class="flex justify-between text-xs text-purple-400">
-          <a href="#">¿Has olvidado tu contraseña?</a>
+          <router-link to="/recuperar-contraseña">¿Has olvidado tu contraseña?</router-link>
           <router-link to="/register">CREAR CUENTA</router-link>
         </div>
       </form>

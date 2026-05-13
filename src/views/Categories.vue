@@ -7,7 +7,7 @@ import AnimeCard from '../components/AnimeCard.vue'
 
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser } = useAuth()
-const { loadProfile } = useProfile()
+const { currentProfile, loadProfile } = useProfile()
 
 // Mobile menu
 const mobileMenuOpen = ref(false)
@@ -188,7 +188,8 @@ onMounted(async () => {
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+              <img v-if="currentProfile?.avatar" :src="currentProfile.avatar" :alt="currentProfile.name" class="profile-avatar" />
+              <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
             <button class="btn-logout" @click="handleLogout">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -558,6 +559,13 @@ onMounted(async () => {
   transform: scale(1.1);
   border-color: rgba(255, 255, 255, 0.4);
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
+}
+
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .btn-logout {

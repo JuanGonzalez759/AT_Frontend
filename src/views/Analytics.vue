@@ -373,7 +373,7 @@ function handleLogout() {
 }
 
 function goToTestWatch() {
-  router.push('/watch?anime=one-piece')
+  router.push('/anime/1')
 }
 </script>
 
@@ -423,7 +423,8 @@ function goToTestWatch() {
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+              <img v-if="currentProfile?.avatar" :src="currentProfile.avatar" :alt="currentProfile.name" class="profile-avatar" />
+              <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
             <button class="btn-logout" @click="handleLogout">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -581,7 +582,7 @@ function goToTestWatch() {
                   v-for="(anime, index) in analyticsData.top_animes.most_saved" 
                   :key="anime.id"
                   class="top-list-item"
-                  @click="router.push(`/watch?anime=${anime.id}`)"
+                  @click="router.push(`/anime/${anime.id}`)"
                 >
                   <span class="rank">{{ index + 1 }}</span>
                   <img :src="anime.cover_image" :alt="anime.title" class="list-thumb" />
@@ -601,7 +602,7 @@ function goToTestWatch() {
                   v-for="(anime, index) in analyticsData.top_animes.best_rated" 
                   :key="anime.id"
                   class="top-list-item"
-                  @click="router.push(`/watch?anime=${anime.id}`)"
+                  @click="router.push(`/anime/${anime.id}`)"
                 >
                   <span class="rank">{{ index + 1 }}</span>
                   <img :src="anime.cover_image" :alt="anime.title" class="list-thumb" />
@@ -784,6 +785,13 @@ function goToTestWatch() {
   transform: scale(1.1);
   border-color: rgba(255, 255, 255, 0.4);
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
+}
+
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .btn-logout {

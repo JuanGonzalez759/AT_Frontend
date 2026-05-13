@@ -260,6 +260,14 @@ async function handleLogout() {
   }
 }
 
+// Recargar progreso cuando cambia el perfil
+watch(() => currentProfile.value?.id, async (newProfileId, oldProfileId) => {
+  if (newProfileId && oldProfileId && newProfileId !== oldProfileId) {
+    // El perfil cambió, recargar progreso
+    await loadAnimeProgress()
+  }
+})
+
 onMounted(async () => {
   const user = await loadCurrentUser()
   if (!user) {
@@ -865,7 +873,7 @@ function goHome() {
           <button class="btn-watchlist" @click="router.push('/my-list')">Mi Lista</button>
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <img v-if="currentProfile" :src="currentProfile.avatar" alt="Profile" class="profile-avatar" />
+              <img v-if="currentProfile?.avatar" :src="currentProfile.avatar" :alt="currentProfile.name" class="profile-avatar" />
               <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
           </div>

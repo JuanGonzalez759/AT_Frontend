@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useProfile } from '../composables/useProfile'
@@ -16,6 +16,14 @@ const isLoading = ref(true)
 const isSaved = ref(false)
 const mobileMenuOpen = ref(false)
 
+// Recargar datos cuando cambia el perfil
+watch(() => currentProfile.value?.id, async (newProfileId, oldProfileId) => {
+  if (newProfileId && oldProfileId && newProfileId !== oldProfileId) {
+    // El perfil cambió, recargar watchlist status
+    await checkIfSaved()
+  }
+})
+
 onMounted(async () => {
   await loadCurrentUser()
   await loadProfile()
@@ -26,7 +34,7 @@ onMounted(async () => {
 
 async function loadAnimeDetails() {
   try {
-    const response = await authenticatedFetch(`/api/backoffice/animes/${animeId.value}/public/`)
+    const response = await authenticatedFetch(`/api/backoffice/public/animes/${animeId.value}/`)
     if (response.ok) {
       anime.value = await response.json()
     }
@@ -37,10 +45,10 @@ async function loadAnimeDetails() {
 
 async function loadEpisodes() {
   try {
-    const response = await authenticatedFetch(`/api/backoffice/episodes/?anime=${animeId.value}`)
+    const response = await authenticatedFetch(`/api/backoffice/episodes/?anime_id=${animeId.value}`)
     if (response.ok) {
       const data = await response.json()
-      episodes.value = data.sort((a, b) => a.episode_number - b.episode_number)
+      episodes.value = data.results.sort((a, b) => a.episode_number - b.episode_number)
     }
   } catch (error) {
     console.error('Error loading episodes:', error)
@@ -160,7 +168,8 @@ const genresList = computed(() => {
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
-              <span>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+              <img v-if="currentProfile?.avatar" :src="currentProfile.avatar" :alt="currentProfile.name" class="profile-avatar" />
+              <span v-else>{{ currentUser.username.charAt(0).toUpperCase() }}</span>
             </button>
             <button class="btn-logout" @click="handleLogout">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -456,6 +465,13 @@ const genresList = computed(() => {
   transform: scale(1.1);
   border-color: rgba(255, 255, 255, 0.4);
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.5);
+}
+
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .btn-logout {

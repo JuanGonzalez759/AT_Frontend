@@ -43,6 +43,18 @@ const availableBackgrounds = ref([
 const profiles = ref([])
 const isLoading = ref(true)
 const MAX_PROFILES = 4
+const currentBackground = ref('/Background_profiles.png')
+const defaultBackground = '/Background_profiles.png'
+
+function handleProfileHover(profile) {
+  if (profile.background) {
+    currentBackground.value = profile.background
+  }
+}
+
+function handleProfileLeave() {
+  currentBackground.value = defaultBackground
+}
 
 async function loadProfiles() {
   isLoading.value = true
@@ -222,7 +234,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="profile-container">
+  <div 
+    class="profile-container"
+    :style="{ backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(10, 10, 10, 0.7)), url('${currentBackground}')` }"
+  >
     <div class="profile-header">
       <h1 class="logo">AniToki</h1>
     </div>
@@ -239,6 +254,8 @@ onMounted(async () => {
           :key="profile.id"
           class="profile-item"
           @click="handleSelectProfile(profile)"
+          @mouseenter="handleProfileHover(profile)"
+          @mouseleave="handleProfileLeave"
         >
           <div class="profile-avatar" :style="{ borderColor: profile.color }">
             <img :src="profile.avatar" :alt="profile.name" />
@@ -396,14 +413,15 @@ onMounted(async () => {
 <style scoped>
 .profile-container {
   min-height: 100vh;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(10, 10, 10, 0.7)),
-    url('/Background_profiles.png') center/cover;
+  background-size: cover;
+  background-position: center;
   background-attachment: fixed;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   padding: 2rem;
+  transition: background-image 0.5s ease-in-out;
 }
 
 .profile-header {

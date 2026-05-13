@@ -1,9 +1,9 @@
-import { ref } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useAuth } from './useAuth'
 import { useProfile } from './useProfile'
 
-// Cache compartido entre todos los componentes
-const watchlistCache = ref(null)
+// Cache vinculado por perfil
+const watchlistCacheByProfile = ref({})
 const watchlistLoading = ref(false)
 let watchlistPromise = null
 
@@ -11,10 +11,33 @@ export function useWatchlist() {
   const { authenticatedFetch } = useAuth()
   const { currentProfile } = useProfile()
 
+  // Computed que devuelve el cache del perfil actual
+  const watchlistCache = computed(() => {
+    if (!currentProfile.value?.id) return null
+    return watchlistCacheByProfile.value[currentProfile.value.id] || null
+  })
+
+  // Limpiar el promise cuando cambia el perfil
+  watch(() => currentProfile.value?.id, (newProfileId, oldProfileId) => {
+    if (newProfileId !== oldProfileId) {
+      // El perfil cambió, invalidar el promise actual
+      watchlistPromise = null
+    }
+  })
+
+  function setProfileCache(data) {
+    if (!currentProfile.value?.id) return
+    watchlistCacheByProfile.value[currentProfile.value.id] = data
+  }
+
+  function clearProfileCache() {
+    if (!currentProfile.value?.id) return
+    delete watchlistCacheByProfile.value[currentProfile.value.id]
+  }
+
   async function loadWatchlist() {
     // Si no hay perfil, retornar array vacío
     if (!currentProfile.value) {
-      watchlistCache.value = []
       return []
     }
 
@@ -23,8 +46,8 @@ export function useWatchlist() {
       return watchlistPromise
     }
 
-    // Si ya tenemos cache válido, retornarlo
-    if (watchlistCache.value !== null) {
+    // Si ya tenemos cache válido para este perfil, retornarlo
+    if (watchlistCache.value !== null && watchlistCache.value !== undefined) {
       return watchlistCache.value
     }
 
@@ -36,15 +59,15 @@ export function useWatchlist() {
         
         if (response.ok) {
           const data = await response.json()
-          watchlistCache.value = data
+          setProfileCache(data)
           return data
         } else {
-          watchlistCache.value = []
+          setProfileCache([])
           return []
         }
       } catch (error) {
         console.error('Error loading watchlist:', error)
-        watchlistCache.value = []
+        setProfileCache([])
         return []
       } finally {
         watchlistLoading.value = false
@@ -61,7 +84,7 @@ export function useWatchlist() {
   }
 
   function clearCache() {
-    watchlistCache.value = null
+    clearProfileCache()
   }
 
   async function addToWatchlist(animeId) {
@@ -72,7 +95,7 @@ export function useWatchlist() {
       })
 
       if (response.ok) {
-        clearCache() // Invalidar cache para que se recargue
+        clearProfileCache() // Invalidar cache para que se recargue
         return true
       }
       return false
@@ -89,7 +112,7 @@ export function useWatchlist() {
       })
 
       if (response.ok) {
-        clearCache() // Invalidar cache para que se recargue
+        clearProfileCache() // Invalidar cache para que se recargue
         return true
       }
       return false
