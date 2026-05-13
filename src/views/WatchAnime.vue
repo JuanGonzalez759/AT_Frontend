@@ -802,9 +802,9 @@ const displayedDescription = computed(() => {
 const animeProgress = ref({ current_episode: 0, watched: false })
 
 async function loadAnimeProgress() {
-  if (!animeId.value) return
+  if (!animeId.value || !currentProfile.value) return
   try {
-    const resp = await authenticatedFetch(`/api/backoffice/progress/${animeId.value}/`)
+    const resp = await authenticatedFetch(`/api/backoffice/progress/${animeId.value}/?profile_id=${currentProfile.value.id}`)
     if (resp.ok) {
       const data = await resp.json()
       animeProgress.value = {
