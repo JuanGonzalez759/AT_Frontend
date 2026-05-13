@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
 const currentUser = ref(null)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
 function getCookie(name) {
   const value = `; ${document.cookie}`
@@ -12,7 +13,7 @@ function getCookie(name) {
 }
 
 async function setCsrfCookie() {
-  await fetch('/api/csrf/', {
+  await fetch(`${API_BASE_URL}/api/csrf/`, {
     credentials: 'include',
   })
 }
@@ -20,7 +21,7 @@ async function setCsrfCookie() {
 export function useAuth() {
   async function loadCurrentUser() {
     try {
-      const response = await fetch('/api/auth/user/', { credentials: 'include' })
+      const response = await fetch(`${API_BASE_URL}/api/auth/user/`, { credentials: 'include' })
       if (!response.ok) {
         currentUser.value = null
         return null
@@ -38,7 +39,7 @@ export function useAuth() {
     await setCsrfCookie()
     const csrfToken = getCookie('csrftoken')
     
-    const response = await fetch('/api/auth/register/', {
+    const response = await fetch(`${API_BASE_URL}/api/auth/register/`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -62,7 +63,7 @@ export function useAuth() {
     await setCsrfCookie()
     const csrfToken = getCookie('csrftoken')
     
-    const response = await fetch('/api/auth/login/', {
+    const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
       method: 'POST',
       credentials: 'include',
       headers: {
