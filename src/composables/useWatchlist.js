@@ -55,7 +55,13 @@ export function useWatchlist() {
     watchlistLoading.value = true
     watchlistPromise = (async () => {
       try {
-        const response = await authenticatedFetch('/api/manager/watchlist/')
+        const profileId = currentProfile.value?.id
+        if (!profileId) {
+          setProfileCache([])
+          return []
+        }
+
+        const response = await authenticatedFetch(`/api/manager/watchlist/?profile_id=${profileId}`)
         
         if (response.ok) {
           const data = await response.json()
@@ -89,9 +95,15 @@ export function useWatchlist() {
 
   async function addToWatchlist(animeId) {
     try {
+      const profileId = currentProfile.value?.id
+      if (!profileId) return false
+
       const response = await authenticatedFetch('/api/manager/watchlist/', {
         method: 'POST',
-        body: JSON.stringify({ anime_id: animeId })
+        body: JSON.stringify({ 
+          anime_id: animeId,
+          profile_id: profileId
+        })
       })
 
       if (response.ok) {
@@ -107,7 +119,10 @@ export function useWatchlist() {
 
   async function removeFromWatchlist(animeId) {
     try {
-      const response = await authenticatedFetch(`/api/manager/watchlist/remove/${animeId}/`, {
+      const profileId = currentProfile.value?.id
+      if (!profileId) return false
+
+      const response = await authenticatedFetch(`/api/manager/watchlist/remove/${animeId}/?profile_id=${profileId}`, {
         method: 'DELETE'
       })
 

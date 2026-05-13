@@ -159,9 +159,7 @@ function getAnimeProgress(animeId) {
 
 async function loadAnimes() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/public/animes/?page_size=100`, {
-      credentials: 'include'
-    })
+    const response = await authenticatedFetch(`/api/backoffice/public/animes/?page_size=100`)
     if (response.ok) {
       const data = await response.json()
       const animes = data.results || data

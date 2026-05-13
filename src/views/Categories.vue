@@ -6,7 +6,7 @@ import { useProfile } from '../composables/useProfile'
 import AnimeCard from '../components/AnimeCard.vue'
 
 const router = useRouter()
-const { currentUser, logout, loadCurrentUser, API_BASE_URL } = useAuth()
+const { currentUser, logout, loadCurrentUser, API_BASE_URL, authenticatedFetch } = useAuth()
 const { currentProfile, loadProfile } = useProfile()
 
 // Mobile menu
@@ -91,9 +91,7 @@ const animeCount = computed(() => {
 async function loadAnimes() {
   isLoading.value = true
   try {
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/public/animes/?page_size=100`, {
-      credentials: 'include'
-    })
+    const response = await authenticatedFetch(`/api/backoffice/public/animes/?page_size=100`)
     if (response.ok) {
       const data = await response.json()
       const animes = data.results || data
