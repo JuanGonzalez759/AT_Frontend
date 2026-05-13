@@ -2,23 +2,7 @@ import { ref } from 'vue'
 import { useAuth } from './useAuth'
 
 const currentProfile = ref(null)
-const { API_BASE_URL } = useAuth()
-
-// Helper functions
-function getCookie(name) {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) {
-    return parts.pop().split(';').shift()
-  }
-  return ''
-}
-
-async function setCsrfCookie() {
-  await fetch(`${API_BASE_URL}/api/csrf/`, {
-    credentials: 'include',
-  })
-}
+const { API_BASE_URL, authenticatedFetch } = useAuth()
 
 export function useProfile() {
   async function loadProfile() {
@@ -30,28 +14,10 @@ export function useProfile() {
     }
 
     try {
-      // Primero verificar que el perfil existe
-      const response = await fetch(`${API_BASE_URL}/api/manager/profiles/${profileId}/`, {
-        credentials: 'include'
-      })
+      const response = await authenticatedFetch(`/api/manager/profiles/${profileId}/`)
 
       if (response.ok) {
         const data = await response.json()
-        
-        // Guardar el perfil en la sesión del backend
-        await setCsrfCookie()
-        const csrfToken = getCookie('csrftoken')
-        
-        await fetch(`${API_BASE_URL}/api/manager/profiles/select/`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken,
-          },
-          body: JSON.stringify({ profile_id: profileId })
-        })
-        
         currentProfile.value = data
         return data
       } else {
@@ -70,35 +36,24 @@ export function useProfile() {
 
   async function selectProfile(profileId, remember = true) {
     try {
-      // Guardar el perfil en la sesión del backend
-      await setCsrfCookie()
-      const csrfToken = getCookie('csrftoken')
-      
-      const response = await fetch(`${API_BASE_URL}/api/manager/profiles/select/`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': csrfToken,
-        },
-        body: JSON.stringify({ profile_id: profileId })
-      })
+      // Verificar que el perfil existe
+      const response = await authenticatedFetch(`/api/manager/profiles/${profileId}/`)
 
       if (!response.ok) {
         throw new Error('Failed to select profile')
       }
 
       const data = await response.json()
-      currentProfile.value = data.profile
+      currentProfile.value = data
 
-      // También guardar en localStorage/sessionStorage para persistencia
+      // Guardar en localStorage/sessionStorage
       if (remember) {
         localStorage.setItem('currentProfileId', profileId)
       } else {
         sessionStorage.setItem('currentProfileId', profileId)
       }
 
-      return data.profile
+      return data
     } catch (error) {
       console.error('Error selecting profile:', error)
       return null
@@ -113,9 +68,7 @@ export function useProfile() {
 
   async function fetchProfiles() {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/manager/profiles/`, {
-        credentials: 'include'
-      })
+      const response = await authenticatedFetch('/api/manager/profiles/')
 
       if (response.ok) {
         return await response.json()
