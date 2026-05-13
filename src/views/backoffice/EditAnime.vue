@@ -5,7 +5,7 @@ import { useAuth } from '../../composables/useAuth'
 
 const router = useRouter()
 const route = useRoute()
-const { API_BASE_URL } = useAuth()
+const { API_BASE_URL, authenticatedFetch } = useAuth()
 
 const animeForm = ref({
   title: '',
@@ -21,20 +21,7 @@ const isSaving = ref(false)
 const isLoading = ref(true)
 const errorMessage = ref('')
 
-function getCookie(name) {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) {
-    return parts.pop().split(';').shift()
-  }
-  return ''
-}
 
-async function setCsrfCookie() {
-  await fetch(`${API_BASE_URL}/api/csrf/`, {
-    credentials: 'include',
-  })
-}
 
 onMounted(async () => {
   await loadAnime()
@@ -43,9 +30,7 @@ onMounted(async () => {
 async function loadAnime() {
   isLoading.value = true
   try {
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/${route.params.id}/`, {
-      credentials: 'include'
-    })
+    const response = await authenticatedFetch(`/api/backoffice/animes/${route.params.id}/`)
 
     if (response.ok) {
       const anime = await response.json()
@@ -80,16 +65,11 @@ async function saveAnime() {
   errorMessage.value = ''
 
   try {
-    await setCsrfCookie()
-    const csrfToken = getCookie('csrftoken')
-    
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/${route.params.id}/`, {
+    const response = await authenticatedFetch(`/api/backoffice/animes/${route.params.id}/`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/json'
       },
-      credentials: 'include',
       body: JSON.stringify(animeForm.value)
     })
 

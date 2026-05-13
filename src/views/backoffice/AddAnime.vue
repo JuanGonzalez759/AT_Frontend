@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 
 const router = useRouter()
-const { API_BASE_URL } = useAuth()
+const { API_BASE_URL, authenticatedFetch } = useAuth()
 
 const animeForm = ref({
   title: '',
@@ -43,20 +43,7 @@ function closeErrorModal() {
   errorModalMessage.value = ''
 }
 
-function getCookie(name) {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) {
-    return parts.pop().split(';').shift()
-  }
-  return ''
-}
 
-async function setCsrfCookie() {
-  await fetch(`${API_BASE_URL}/api/csrf/`, {
-    credentials: 'include',
-  })
-}
 
 function searchJikan() {
   // Limpiar timeout anterior
@@ -77,9 +64,7 @@ function searchJikan() {
   searchTimeout = setTimeout(async () => {
     isSearching.value = true
     try {
-      const response = await fetch(`${API_BASE_URL}/api/backoffice/jikan/search/?q=${encodeURIComponent(query)}`, {
-        credentials: 'include'
-      })
+      const response = await authenticatedFetch(`/api/backoffice/jikan/search/?q=${encodeURIComponent(query)}`)
       
       if (response.ok) {
         const data = await response.json()
@@ -137,16 +122,11 @@ async function saveAnime() {
   errorMessage.value = ''
 
   try {
-    await setCsrfCookie()
-    const csrfToken = getCookie('csrftoken')
-    
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/`, {
+    const response = await authenticatedFetch(`/api/backoffice/animes/`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/json'
       },
-      credentials: 'include',
       body: JSON.stringify(animeForm.value)
     })
 

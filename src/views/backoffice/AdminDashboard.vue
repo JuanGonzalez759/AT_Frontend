@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 
 const router = useRouter()
-const { user, logout, API_BASE_URL } = useAuth()
+const { user, logout, API_BASE_URL, authenticatedFetch } = useAuth()
 
 const adminProfile = ref({
   name: 'Admin',
@@ -26,9 +26,7 @@ onActivated(() => {
 
 async function loadAnimes() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/?page_size=100`, {
-      credentials: 'include'
-    })
+    const response = await authenticatedFetch(`/api/backoffice/animes/?page_size=100`)
     if (response.ok) {
       const data = await response.json()
       // La API devuelve un objeto paginado con results
@@ -79,13 +77,8 @@ async function confirmDelete() {
   if (!animeToDelete.value) return
 
   try {
-    const csrfToken = getCookie('csrftoken')
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/${animeToDelete.value.id}/`, {
-      method: 'DELETE',
-      credentials: 'include',
-      headers: {
-        'X-CSRFToken': csrfToken,
-      },
+    const response = await authenticatedFetch(`/api/backoffice/animes/${animeToDelete.value.id}/`, {
+      method: 'DELETE'
     })
 
     if (response.ok) {
@@ -109,14 +102,7 @@ async function confirmDelete() {
   }
 }
 
-function getCookie(name) {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) {
-    return parts.pop().split(';').shift()
-  }
-  return ''
-}
+
 </script>
 
 <template>

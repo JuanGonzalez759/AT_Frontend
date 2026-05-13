@@ -5,7 +5,7 @@ import { useAuth } from '../../composables/useAuth'
 
 const router = useRouter()
 const route = useRoute()
-const { API_BASE_URL } = useAuth()
+const { API_BASE_URL, authenticatedFetch } = useAuth()
 
 const animeId = ref(route.params.id)
 const anime = ref(null)
@@ -34,20 +34,7 @@ const episodeForm = ref({
   thumbnail: ''
 })
 
-function getCookie(name) {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) {
-    return parts.pop().split(';').shift()
-  }
-  return ''
-}
 
-async function setCsrfCookie() {
-  await fetch(`${API_BASE_URL}/api/csrf/`, {
-    credentials: 'include',
-  })
-}
 
 onMounted(async () => {
   await loadAnime()
@@ -56,9 +43,7 @@ onMounted(async () => {
 
 async function loadAnime() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/animes/${animeId.value}/`, {
-      credentials: 'include'
-    })
+    const response = await authenticatedFetch(`/api/backoffice/animes/${animeId.value}/`)
     if (response.ok) {
       anime.value = await response.json()
     }
@@ -70,9 +55,7 @@ async function loadAnime() {
 async function loadEpisodes() {
   isLoading.value = true
   try {
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/?anime_id=${animeId.value}`, {
-      credentials: 'include'
-    })
+    const response = await authenticatedFetch(`/api/backoffice/episodes/?anime_id=${animeId.value}`)
     if (response.ok) {
       const data = await response.json()
       episodes.value = data.results || data
@@ -93,16 +76,11 @@ async function saveEpisode() {
   }
 
   try {
-    await setCsrfCookie()
-    const csrfToken = getCookie('csrftoken')
-    
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/`, {
+    const response = await authenticatedFetch(`/api/backoffice/episodes/`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/json'
       },
-      credentials: 'include',
       body: JSON.stringify({
         ...episodeForm.value,
         anime_id: animeId.value
@@ -152,15 +130,8 @@ async function confirmDelete() {
   if (!episodeToDelete.value) return
 
   try {
-    await setCsrfCookie()
-    const csrfToken = getCookie('csrftoken')
-    
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/${episodeToDelete.value.id}/`, {
-      method: 'DELETE',
-      headers: {
-        'X-CSRFToken': csrfToken,
-      },
-      credentials: 'include'
+    const response = await authenticatedFetch(`/api/backoffice/episodes/${episodeToDelete.value.id}/`, {
+      method: 'DELETE'
     })
 
     if (response.ok) {
@@ -213,16 +184,11 @@ async function saveEdit() {
   }
 
   try {
-    await setCsrfCookie()
-    const csrfToken = getCookie('csrftoken')
-    
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/${episodeToEdit.value.id}/`, {
+    const response = await authenticatedFetch(`/api/backoffice/episodes/${episodeToEdit.value.id}/`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/json'
       },
-      credentials: 'include',
       body: JSON.stringify({
         ...editForm.value,
         anime_id: animeId.value,

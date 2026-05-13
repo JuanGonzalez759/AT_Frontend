@@ -321,9 +321,7 @@ async function loadAnime() {
   if (!animeId.value) return
   
   try {
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/public/animes/${animeId.value}/`, {
-      credentials: 'include'
-    })
+    const response = await authenticatedFetch(`/api/backoffice/public/animes/${animeId.value}/`)
     if (response.ok) {
       anime.value = await response.json()
       // Verificar si está en la watchlist
@@ -352,9 +350,7 @@ async function loadEpisodeData() {
   
   isLoading.value = true
   try {
-    const response = await fetch(`${API_BASE_URL}/api/backoffice/episodes/?anime_id=${animeId.value}`, {
-      credentials: 'include'
-    })
+    const response = await authenticatedFetch(`/api/backoffice/episodes/?anime_id=${animeId.value}`)
     if (response.ok) {
       const data = await response.json()
       episodes.value = data.results || data
