@@ -784,17 +784,17 @@ const onePieceDescriptions = {
 }
 
 const displayedDescription = computed(() => {
-  // Priorizar descripción del episodio o del anime si existe
-  const desc = currentEpisode.value?.description || anime.value?.description || ''
-  if (desc && desc.trim().length > 0) return desc
-
-  // Si es One Piece (slug o título o id conocido), usar hardcoded
+  // Si es One Piece, priorizar descripciones hardcodeadas
   const slug = anime.value?.anime_slug?.toLowerCase()
   const title = (anime.value?.title || '').toLowerCase()
   if (slug === 'one-piece' || title.includes('one piece') || anime.value?.id === 6) {
     const num = currentEpisode.value?.episode_number
     if (num && onePieceDescriptions[num]) return onePieceDescriptions[num]
   }
+
+  // Si no hay hardcoded, usar descripción del episodio o del anime
+  const desc = currentEpisode.value?.description || anime.value?.description || ''
+  if (desc && desc.trim().length > 0) return desc
 
   return 'Sin descripción disponible.'
 })
@@ -1114,7 +1114,7 @@ function goHome() {
                 <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
               </svg>
             </button>
-            <button class="btn-continue" v-if="animeProgress.current_episode > 0" @click="goToContinueWatching">
+            <button class="btn-continue" v-if="animeProgress.current_episode > 0 && continueEpisode !== episodeNumber" @click="goToContinueWatching">
               SEGUIR VIENDO E{{ continueEpisode }}
             </button>
           </div>
