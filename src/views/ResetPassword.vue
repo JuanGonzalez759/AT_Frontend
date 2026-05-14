@@ -17,25 +17,6 @@ const tokenValid = ref(false)
 const username = ref('')
 const token = ref('')
 
-// Obtener CSRF token de las cookies
-function getCookie(name) {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) return parts.pop().split(';').shift()
-  return null
-}
-
-// Cargar CSRF token
-async function loadCSRFToken() {
-  try {
-    await fetch(`${API_BASE_URL}/api/csrf/`, {
-      credentials: 'include',
-    })
-  } catch (error) {
-    console.error('Error loading CSRF token:', error)
-  }
-}
-
 function activateInput(event) {
   const input = event.target
   const wrap = input.closest('.input-wrap')
@@ -59,15 +40,11 @@ async function verifyToken() {
   }
 
   try {
-    const csrfToken = getCookie('csrftoken')
-    
     const response = await fetch(`${API_BASE_URL}/api/auth/password-reset/verify/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken || '',
       },
-      credentials: 'include',
       body: JSON.stringify({ token: token.value }),
     })
 
@@ -101,15 +78,11 @@ async function handleResetPassword() {
   isLoading.value = true
 
   try {
-    const csrfToken = getCookie('csrftoken')
-    
     const response = await fetch(`${API_BASE_URL}/api/auth/password-reset/confirm/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken || '',
       },
-      credentials: 'include',
       body: JSON.stringify({
         token: token.value,
         password: password.value,
@@ -141,9 +114,8 @@ function toggleConfirmPassword() {
   showConfirmPassword.value = !showConfirmPassword.value
 }
 
-onMounted(async () => {
-  await loadCSRFToken()
-  await verifyToken()
+onMounted(() => {
+  verifyToken()
 })
 </script>
 

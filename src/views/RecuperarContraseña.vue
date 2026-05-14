@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -9,25 +9,6 @@ const email = ref('')
 const successMessage = ref('')
 const errorMessage = ref('')
 const isLoading = ref(false)
-
-// Obtener CSRF token de las cookies
-function getCookie(name) {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) return parts.pop().split(';').shift()
-  return null
-}
-
-// Cargar CSRF token al montar
-async function loadCSRFToken() {
-  try {
-    await fetch(`${API_BASE_URL}/api/csrf/`, {
-      credentials: 'include',
-    })
-  } catch (error) {
-    console.error('Error loading CSRF token:', error)
-  }
-}
 
 function activateInput(event) {
   const input = event.target
@@ -55,15 +36,11 @@ async function handleRequestReset() {
   isLoading.value = true
 
   try {
-    const csrfToken = getCookie('csrftoken')
-    
     const response = await fetch(`${API_BASE_URL}/api/auth/password-reset/request/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken || '',
       },
-      credentials: 'include',
       body: JSON.stringify({ email: email.value }),
     })
 
@@ -85,10 +62,6 @@ async function handleRequestReset() {
 function goBack() {
   router.push('/login')
 }
-
-onMounted(() => {
-  loadCSRFToken()
-})
 </script>
 
 <template>

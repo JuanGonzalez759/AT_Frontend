@@ -1,350 +1,574 @@
-# AT_Frontend - Vue 3 Application
+# AT_Frontend - Vue.js 3 + Vite
 
-Frontend de Anitoki construido con Vue 3, Vue Router y Vite.
+Frontend de **AniToki**, plataforma de streaming de anime construida con Vue.js 3, Composition API, Vue Router 4 y Vite 6. Sistema completo con autenticación JWT, gestión de perfiles múltiples, watchlist, reproducción de video HLS y panel de administración.
+
+## Características
+
+- ✅ **Autenticación JWT** con localStorage
+- ✅ **Sistema multi-perfil** (hasta 4 perfiles por usuario)
+- ✅ **Watchlist personalizada** por perfil con sincronización en tiempo real
+- ✅ **Seguimiento de progreso** ("Continuar viendo" automático)
+- ✅ **Reproductor de video** con soporte M3U8/HLS (HLS.js)
+- ✅ **Panel de administración** para gestionar animes y episodios
+- ✅ **Recuperación de contraseña** vía email
+- ✅ **Búsqueda y filtros** de animes
+- ✅ **Categorías** navegables
+- ✅ **Responsive design** (mobile, tablet, desktop)
+- ✅ **SPA routing** con Vue Router 4
+- ✅ **Deployment en Render** Static Site
 
 ## Requisitos
 
-- Node.js 18+ y npm
+- Node.js 18+ (recomendado 20.x)
+- npm 9+ o pnpm 8+
 
-### Instalación de Node.js
+## Instalación (Desarrollo Local)
 
-**Windows:**
-- Descargar desde: https://nodejs.org/
+### 1. Clonar el repositorio
 
-**Linux (Ubuntu/Debian):**
 ```bash
-sudo apt update
-sudo apt install -y nodejs npm
+git clone https://github.com/ialgar367/AT_Frontend.git
+cd AT_Frontend
 ```
 
-**macOS:**
-```bash
-brew install node
-```
-
-## Instalación
+### 2. Instalar dependencias
 
 ```bash
 npm install
 ```
 
-## Ejecución
+### 3. Configurar variables de entorno
 
-### Modo desarrollo
+Copiar `.env.example` a `.env`:
+
+```bash
+# Windows
+copy .env.example .env
+
+# Linux/macOS
+cp .env.example .env
+```
+
+Editar `.env` para desarrollo local:
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+Para producción crear `.env.production`:
+
+```env
+VITE_API_BASE_URL=https://anitoki-backend.onrender.com
+```
+
+### 4. Ejecutar servidor de desarrollo
 
 ```bash
 npm run dev
 ```
 
-Aplicación en: **http://127.0.0.1:5173/**
+Servidor en: **http://127.0.0.1:5173/**
 
-### Build de producción
+### 5. Build para producción
 
 ```bash
 npm run build
 ```
 
-Los archivos se generan en `dist/`
+Los archivos se generan en `dist/` incluyendo `404.html` para routing de SPA.
 
-### Preview de producción
+## Tecnologías
 
-```bash
-npm run preview
-```
+| Tecnología | Versión | Uso |
+|------------|---------|-----|
+| Vue.js | 3.x | Framework reactivo |
+| Vue Router | 4.x | Routing de SPA |
+| Vite | 6.0.5 | Build tool y dev server |
+| HLS.js | 1.6.16+ | Reproducción de video M3U8 |
+| Axios | 1.7.x | (opcional) HTTP client |
 
-## Estructura
+## Estructura del Proyecto
 
 ```
 AT_Frontend/
-├── package.json
-├── vite.config.js
+├── package.json                # Dependencias y scripts
+├── vite.config.js             # Configuración de Vite
+├── render.yaml                # Configuración para Render
+├── .env.example               # Plantilla de variables de entorno
+├── .env                       # Variables de desarrollo (ignorado por git)
+├── .env.production            # Variables de producción
+│
 ├── public/
-│   └── profiles/
+│   └── profiles/              # Avatares de perfiles (profile1.png, ...)
+│
 └── src/
-    ├── App.vue
-    ├── main.js
-    ├── style.css
+    ├── App.vue                # Componente raíz
+    ├── main.js                # Punto de entrada
+    ├── style.css              # Estilos globales
+    │
     ├── components/
-    │   └── AnimeCard.vue
+    │   ├── AnimeCard.vue             # Tarjeta de anime (thumbnail, título, etc.)
+    │   └── ContinueWatchingCard.vue  # Tarjeta "Continuar viendo"
+    │
     ├── composables/
-    │   └── useAuth.js
+    │   ├── useAuth.js         # Autenticación JWT (login, logout, user)
+    │   ├── useProfile.js      # Gestión de perfiles (loadProfile, selectProfile)
+    │   └── useWatchlist.js    # Watchlist (addToWatchlist, removeFromWatchlist)
+    │
     ├── router/
-    │   └── index.js
+    │   └── index.js           # Rutas y navigation guards
+    │
     └── views/
-        ├── Login.vue
-        ├── Register.vue
-        ├── Home.vue
+        ├── Login.vue                  # Página de login
+        ├── Register.vue               # Página de registro
+        ├── RecuperarContraseña.vue    # Solicitar reset de password
+        ├── ResetPassword.vue          # Confirmar nueva password
+        ├── Home.vue                   # Página principal (listado de animes)
+        ├── WatchAnime.vue             # Reproductor de video
+        ├── Categories.vue             # Página de categorías
+        │
         ├── manager/
-        │   └── ChooseProfile.vue
-        └── backoffice/
-            ├── AdminDashboard.vue
-            └── AddAnime.vue
+        │   └── ChooseProfile.vue      # Selección de perfil
+        │
+        └── backoffice/                # Panel de administración
+            ├── AdminDashboard.vue     # Dashboard principal
+            ├── AddAnime.vue           # Agregar anime
+            ├── EditAnime.vue          # Editar anime
+            └── ManageEpisodes.vue     # Gestionar episodios
 ```
 
 ## Rutas
 
-### Públicas
-- `/login` - Página de login
-- `/register` - Página de registro
+### Rutas Públicas (sin autenticación)
 
-### Requiere Autenticación
-- `/home` - Página principal
-- `/manager/profiles` - Selección de perfiles
+| Ruta | Componente | Descripción |
+|------|------------|-------------|
+| `/` | Redirect → `/login` | Redirección a login |
+| `/login` | Login.vue | Iniciar sesión |
+| `/register` | Register.vue | Registrarse |
+| `/recuperar-contrasena` | RecuperarContraseña.vue | Solicitar reset de password |
+| `/reset-password` | ResetPassword.vue | Confirmar nueva password (con token) |
 
-### Requiere Admin
-- `/backoffice` - Dashboard de administración
-- `/backoffice/add-anime` - Agregar anime
+### Rutas Autenticadas (requieren JWT token)
 
-```bash
-npm run preview
-```
+| Ruta | Componente | Descripción |
+|------|------------|-------------|
+| `/manager/profiles` | ChooseProfile.vue | Seleccionar perfil |
+| `/home` | Home.vue | Página principal con listado de animes |
+| `/watch/:animeSlug/:episodeNumber` | WatchAnime.vue | Reproductor de video |
+| `/categories` | Categories.vue | Navegación por categorías |
 
-## 📁 Estructura
+### Rutas de Administración (requieren admin)
 
-```
-AT_Frontend/
-├── package.json
-├── vite.config.js          # Configuración de Vite con proxy
-├── .env.example            # Variables de entorno de ejemplo
-├── Dockerfile              # Para Docker
-├── public/
-│   └── profiles/           # Avatares de perfiles
-└── src/
-    ├── App.vue             # Componente raíz
-    ├── main.js             # Punto de entrada
-    ├── style.css           # Estilos globales
-    ├── components/
-    │   └── AnimeCard.vue   # Tarjeta de anime
-    ├── composables/
-    │   └── useAuth.js      # Lógica de autenticación
-    ├── router/
-    │   └── index.js        # Rutas y guards
-    └── views/
-        ├── Login.vue
-        ├── Register.vue
-        ├── Home.vue
-        ├── manager/
-        │   └── ChooseProfile.vue
-        └── backoffice/
-            ├── AdminDashboard.vue
-            └── AddAnime.vue
-```
+| Ruta | Componente | Descripción |
+|------|------------|-------------|
+| `/backoffice` | AdminDashboard.vue | Dashboard de admin |
+| `/backoffice/add-anime` | AddAnime.vue | Agregar anime |
+| `/backoffice/edit-anime/:id` | EditAnime.vue | Editar anime |
+| `/backoffice/manage-episodes/:id` | ManageEpisodes.vue | Gestionar episodios |
 
-## 🛣️ Rutas
+## Composables
 
-### Públicas
-- `/` → Redirige a `/login`
-- `/login` → Página de login
-- `/register` → Página de registro
+### useAuth.js
 
-### Requiere Autenticación
-- `/home` → Página principal
-- `/manager/profiles` → Selección de perfiles
-
-### Requiere Admin
-- `/backoffice` → Dashboard de administración
-- `/backoffice/add-anime` → Agregar nuevo anime
-
-## 🔐 Autenticación
-
-El composable `useAuth` maneja toda la autenticación:
+Maneja toda la autenticación JWT del frontend:
 
 ```javascript
 import { useAuth } from '@/composables/useAuth'
 
-const { currentUser, login, logout, register } = useAuth()
+const { 
+  currentUser,          // Usuario autenticado
+  isAuthenticated,      // Estado de autenticación
+  login,                // (username, password) => Promise
+  logout,               // () => void
+  register,             // (username, email, password) => Promise
+  authenticatedFetch    // (url, options) => Promise (añade Bearer token)
+} = useAuth()
 
 // Login
-await login('username', 'password')
+await login('usuario', 'password123')
 
 // Registro
-await register('username', 'email', 'password')
+await register('nuevo', 'email@example.com', 'password')
 
 // Logout
-await logout()
+logout()
 
-// Usuario actual
-console.log(currentUser.value)
+// Fetch con JWT automático
+const response = await authenticatedFetch('/api/manager/profiles/')
 ```
 
-## 🔧 Configuración
+**Funcionalidades:**
+- Guarda tokens (`access` y `refresh`) en `localStorage`
+- Auto-refresca el token `access` cuando expira (60 min)
+- Proporciona `authenticatedFetch` que añade automáticamente header `Authorization: Bearer {token}`
 
-### Variables de Entorno
+### useProfile.js
 
-Copiar `.env.example` a `.env.local`:
-
-```bash
-cp .env.example .env.local
-```
-
-Editar `.env.local`:
-
-```env
-VITE_API_URL=http://127.0.0.1:8000/api
-```
-
-### Proxy de Vite
-
-El archivo `vite.config.js` está configurado para hacer proxy de `/api` al backend:
+Gestiona el sistema multi-perfil:
 
 ```javascript
-server: {
-  proxy: {
-    '/api': {
-      target: 'http://127.0.0.1:8000',
-      changeOrigin: true,
-    },
-  },
+import { useProfile } from '@/composables/useProfile'
+
+const { 
+  currentProfile,       // Perfil actualmente seleccionado
+  selectProfile,        // (profileId, remember) => void
+  loadProfile,          // () => Promise
+  clearProfile          // () => void
+} = useProfile()
+
+// Seleccionar perfil
+selectProfile(1, true) // true = recordar en localStorage
+
+// Cargar perfil actual
+await loadProfile()
+
+// Limpiar perfil (logout)
+clearProfile()
+```
+
+**Funcionalidades:**
+- Guarda perfil seleccionado en `localStorage` (si remember=true) o `sessionStorage`
+- Carga datos del perfil desde la API
+- Se usa como contexto para watchlist y progreso
+
+### useWatchlist.js
+
+Gestiona la watchlist del perfil actual:
+
+```javascript
+import { useWatchlist } from '@/composables/useWatchlist'
+
+const { 
+  watchlistAnimes,      // Array de animes en watchlist
+  loadWatchlist,        // () => Promise
+  addToWatchlist,       // (animeId) => Promise
+  removeFromWatchlist,  // (animeId) => Promise
+  isInWatchlist         // (animeId) => boolean
+} = useWatchlist()
+
+// Cargar watchlist
+await loadWatchlist()
+
+// Agregar anime
+await addToWatchlist(6) // One Piece
+
+// Eliminar anime
+await removeFromWatchlist(6)
+
+// Verificar si está en watchlist
+if (isInWatchlist(6)) {
+  console.log('One Piece está en tu watchlist')
 }
 ```
 
-Esto permite hacer peticiones a `/api/auth/login/` desde el frontend sin problemas de CORS.
+**Funcionalidades:**
+- Todos los métodos incluyen automáticamente `profile_id` del perfil actual
+- Cache en memoria para evitar llamadas innecesarias
+- Sincronización con backend vía API REST
 
-## 🎨 Estilos
+## Componentes Principales
 
-- Framework CSS: **Tailwind CSS** (utility-first)
-- Animaciones personalizadas en componentes
-- Tema oscuro por defecto
-- Color principal: Púrpura (`#812e96`)
+### AnimeCard.vue
 
-## 📱 Responsive
+Tarjeta de anime reutilizable:
 
-La aplicación está optimizada para:
-- Desktop (1920px+)
-- Tablet (768px+)
-- Mobile (320px+)
+```vue
+<template>
+  <AnimeCard :anime="anime" @click="goToWatch" />
+</template>
 
-## 🐳 Docker
+<script setup>
+import AnimeCard from '@/components/AnimeCard.vue'
 
-Ver [DOCKER_GUIDE.md](../DOCKER_GUIDE.md) en la raíz del proyecto.
-
-Inicio rápido:
-
-```bash
-cd ..
-docker-compose up
+const anime = {
+  id: 6,
+  title: 'One Piece',
+  thumbnail: 'https://...',
+  anime_slug: 'one-piece',
+  episode_count: 50
+}
+</script>
 ```
 
-## 🔨 Scripts Disponibles
+**Props:**
+- `anime` (Object): Datos del anime
+
+**Características:**
+- Thumbnail con lazy loading
+- Título y detalles
+- Hover effect
+
+### ContinueWatchingCard.vue
+
+Tarjeta "Continuar viendo":
+
+```vue
+<template>
+  <ContinueWatchingCard :anime="anime" :progress="progress" />
+</template>
+
+<script setup>
+const progress = {
+  current_episode: 5,
+  watched: false
+}
+</script>
+```
+
+**Props:**
+- `anime` (Object): Datos del anime
+- `progress` (Object): Progreso de visualización
+
+**Características:**
+- Muestra episodio actual
+- Botón "Continuar viendo"
+- Barra de progreso
+
+## Reproductor de Video
+
+El componente `WatchAnime.vue` usa **HLS.js** para reproducir videos M3U8:
+
+```javascript
+import Hls from 'hls.js'
+
+if (Hls.isSupported()) {
+  const hls = new Hls()
+  hls.loadSource('https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8')
+  hls.attachMedia(videoElement)
+} else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+  // Safari nativo
+  videoElement.src = url
+}
+```
+
+**Funcionalidades:**
+- Reproducción de archivos M3U8 (HLS)
+- Controles nativos del navegador
+- Descripción y detalles del episodio
+- Navegación entre episodios
+- Botón "Continuar viendo" si hay progreso previo
+- Actualización automática de progreso
+
+## Autenticación y Guards
+
+### Navigation Guards (router/index.js)
+
+```javascript
+router.beforeEach((to, from, next) => {
+  const { isAuthenticated } = useAuth()
+  const { currentUser } = useAuth()
+
+  // Rutas públicas
+  if (to.meta.public) {
+    return next()
+  }
+
+  // Requiere autenticación
+  if (!isAuthenticated.value) {
+    return next('/login')
+  }
+
+  // Requiere admin
+  if (to.meta.requiresAdmin && currentUser.value?.username !== 'admin') {
+    return next('/home')
+  }
+
+  next()
+})
+```
+
+**Meta campos:**
+- `public: true` - Ruta pública (login, register)
+- `requiresAuth: true` - Requiere JWT token (default)
+- `requiresAdmin: true` - Solo usuario `admin`
+
+## Deployment en Render
+
+### URLs del Proyecto
+
+- **Frontend**: https://anitoki-frontend.onrender.com
+- **Backend API**: https://anitoki-backend.onrender.com
+- **GitHub Frontend**: https://github.com/ialgar367/AT_Frontend
+
+### Configuración
+
+**render.yaml:**
+```yaml
+services:
+  - type: web
+    name: anitoki-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+```
+
+**package.json build script:**
+```json
+{
+  "scripts": {
+    "build": "vite build && node -e \"require('fs').copyFileSync('dist/index.html', 'dist/404.html')\"
+  }
+}
+```
+
+El script crea `404.html` (copia de `index.html`) para que Render redirija todas las rutas a la aplicación Vue.
+
+**Variables de Entorno en Render:**
+```env
+VITE_API_BASE_URL=https://anitoki-backend.onrender.com
+```
+
+### Limitaciones Free Tier
+
+- **Static Site**: Gratis permanente
+- **Bandwidth**: 100GB/mes gratis
+- **Deploy**: Automático al hacer push a GitHub
+
+### F5 Refresh (SPA Routing)
+
+Render Static Sites necesitan configuración especial para SPAs:
+
+1. **404.html** → Copia de index.html (para que Render sirva la app en rutas no existentes)
+2. **render.yaml** → Rewrite rules (redirecciona todas las rutas a index.html)
+
+Sin esto, refrescar la página (F5) en `/home` o `/watch/...` daría error 404.
+
+## Desarrollo
+
+### Scripts Disponibles
 
 ```bash
 # Desarrollo
 npm run dev
 
-# Build para producción
+# Build
 npm run build
 
 # Preview de build
 npm run preview
 
-# Linting (si lo configuras)
+# Linting (si se configura)
 npm run lint
-
-# Formateo con Prettier (si lo configuras)
-npm run format
 ```
 
-## 🚀 Mejoras Futuras Sugeridas
+### Agregar Nueva Vista
 
-- [ ] Agregar Pinia para state management global
-- [ ] Implementar Vitest para tests unitarios
-- [ ] Agregar Cypress para tests E2E
-- [ ] Implementar i18n para múltiples idiomas
-- [ ] Lazy loading de rutas
-- [ ] Progressive Web App (PWA)
-- [ ] Optimización de imágenes
-- [ ] Sistema de notificaciones
-
-## 📝 Convenciones de Código
-
-- Componentes en PascalCase: `AnimeCard.vue`
-- Composables en camelCase: `useAuth.js`
-- Estilos scoped en componentes
-- Props con validación de tipos
-- Eventos con nombres descriptivos
-
-## 🌐 Navegadores Soportados
-
-- Chrome/Edge (últimas 2 versiones)
-- Firefox (últimas 2 versiones)
-- Safari (últimas 2 versiones)
-
-## 🤝 Conectando con el Backend
-
-El frontend se comunica con el backend a través de:
-
-1. **Autenticación**: Sesiones de Django con cookies
-2. **CSRF**: Tokens CSRF en cada petición POST
-3. **CORS**: Configurado en el backend para permitir localhost:5173
-4. **Proxy**: Vite proxy para evitar problemas de CORS en desarrollo
-
-Asegúrate de que el backend esté corriendo antes de iniciar el frontend.
-├── vite.config.js           # Configuración Vite + proxy
-├── index.html
-└── src/
-    ├── main.js              # Entry point
-    ├── App.vue              # Componente raíz
-    ├── style.css            # Estilos globales
-    ├── router/
-    │   └── index.js         # Vue Router + guards
-    ├── views/               # Páginas
-    │   ├── Login.vue        # Página login
-    │   ├── Register.vue     # Página registro
-    │   └── Home.vue         # Panel principal
-    └── composables/
-        └── useAuth.js       # Composable autenticación
-```
-
-## Rutas
-
-- `/` - Redirige a `/login`
-- `/login` - Página de login (requiere guest)
-- `/register` - Página de registro (requiere guest)
-- `/home` - Panel principal (requiere autenticación)
-
-## Composables
-
-### useAuth
-
-Composable para gestionar autenticación:
+1. Crear archivo en `src/views/NuevaVista.vue`
+2. Registrar ruta en `src/router/index.js`:
 
 ```javascript
-import { useAuth } from './composables/useAuth'
-
-const { currentUser, login, register, logout, loadCurrentUser } = useAuth()
-```
-
-**Métodos:**
-- `loadCurrentUser()` - Carga usuario actual desde API
-- `register(username, email, password)` - Registra nuevo usuario
-- `login(username, password)` - Inicia sesión
-- `logout()` - Cierra sesión
-
-**Estado:**
-- `currentUser` - Objeto ref con datos del usuario o null
-
-## Configuración del proxy
-
-Vite está configurado para hacer proxy de `/api` al backend Django:
-
-```javascript
-// vite.config.js
-proxy: {
-  '/api': {
-    target: 'http://127.0.0.1:8000',
-    changeOrigin: true,
-  },
+{
+  path: '/nueva-ruta',
+  component: () => import('@/views/NuevaVista.vue'),
+  meta: { requiresAuth: true }
 }
 ```
 
-Esto permite hacer llamadas a `/api/...` desde Vue sin problemas de CORS.
+### Agregar Nuevo Composable
 
-## Dependencias principales
+1. Crear archivo en `src/composables/useNuevo.js`
+2. Exportar función composable:
 
-- Vue 3.5+
-- Vue Router 4.5+
-- Vite 6.0+
+```javascript
+import { ref } from 'vue'
 
-## Notas de desarrollo
+export function useNuevo() {
+  const data = ref(null)
+  
+  const loadData = async () => {
+    // lógica
+  }
+  
+  return {
+    data,
+    loadData
+  }
+}
+```
 
-El frontend consume la API del backend Django. Asegúrate de que el backend esté corriendo en `http://127.0.0.1:8000` antes de iniciar el frontend.
+## Estilos
+
+- **CSS Puro** con variables CSS
+- **Tema oscuro** por defecto
+- **Color principal**: Púrpura (`#812e96`)
+- **Responsive**: Mobile-first approach
+
+Estilos globales en `src/style.css`:
+
+```css
+:root {
+  --primary-color: #812e96;
+  --bg-color: #0a0a0a;
+  --text-color: #ffffff;
+}
+```
+
+## Responsive
+
+La aplicación está optimizada para:
+- **Mobile**: 320px - 768px
+- **Tablet**: 768px - 1024px
+- **Desktop**: 1024px+
+
+Breakpoints en CSS:
+
+```css
+/* Mobile */
+@media (max-width: 768px) {
+  /* ... */
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* ... */
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  /* ... */
+}
+```
+
+## Workflow de Git
+
+```bash
+# Desarrollo local
+git checkout -b feature/nueva-funcionalidad
+# ... hacer cambios ...
+git add .
+git commit -m "feat: descripción"
+git push origin feature/nueva-funcionalidad
+
+# Merge a main
+git checkout main
+git merge feature/nueva-funcionalidad
+git push origin main
+# Render auto-despliega al detectar push a main
+```
+
+## Mejoras Futuras
+
+- [ ] Implementar Pinia para state management global
+- [ ] Agregar Vitest para tests unitarios
+- [ ] Implementar Cypress/Playwright para E2E tests
+- [ ] Sistema de notificaciones en tiempo real
+- [ ] Modo oscuro/claro (toggle)
+- [ ] Soporte multi-idioma (i18n)
+- [ ] Lazy loading de rutas y componentes
+- [ ] PWA (Progressive Web App)
+- [ ] Optimización de imágenes (WebP)
+- [ ] Sistema de comentarios/ratings
+
+## Licencia
+
+Proyecto de fin de curso - AniToki 2026
+
+## Autor
+
+**Izan Algar** - [@ialgar367](https://github.com/ialgar367)
+**Juan Gonzalez** - [@JuanGonzalez759](https://github.com/JuanGonzalez759)
