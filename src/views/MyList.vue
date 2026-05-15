@@ -7,17 +7,69 @@ import { useWatchlist } from '../composables/useWatchlist'
 import AnimeCard from '../components/AnimeCard.vue'
 
 const router = useRouter()
-const { currentUser, logout, loadCurrentUser } = useAuth()
+const { currentUser, logout, loadCurrentUser, authenticatedFetch } = useAuth()
 const { currentProfile, loadProfile } = useProfile()
 const { loadWatchlist: loadWatchlistData, clearCache } = useWatchlist()
 
 const watchlistAnimes = ref([])
 const isLoading = ref(true)
 
+// Mobile menu
+const mobileMenuOpen = ref(false)
+
+function toggleMobileMenu() {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+// Search functionality
+const searchOpen = ref(false)
+const searchQuery = ref('')
+const searchResults = ref([])
+const isSearching = ref(false)
+
+function toggleSearch() {
+  searchOpen.value = !searchOpen.value
+  if (searchOpen.value) {
+    setTimeout(() => {
+      document.querySelector('.search-input')?.focus()
+    }, 300)
+  } else {
+    searchQuery.value = ''
+    searchResults.value = []
+  }
+}
+
+async function performSearch() {
+  if (!searchQuery.value.trim()) {
+    searchResults.value = []
+    return
+  }
+  
+  isSearching.value = true
+  try {
+    const response = await authenticatedFetch(`/api/backoffice/public/animes/?search=${encodeURIComponent(searchQuery.value)}`)
+    if (response.ok) {
+      const data = await response.json()
+      searchResults.value = data.results?.slice(0, 10) || []
+    }
+  } catch (error) {
+    console.error('Error searching:', error)
+    searchResults.value = []
+  } finally {
+    isSearching.value = false
+  }
+}
+
+function goToAnime(animeId) {
+  router.push(`/anime/${animeId}`)
+  searchOpen.value = false
+  searchQuery.value = ''
+  searchResults.value = []
+}
+
 async function loadWatchlist() {
   isLoading.value = true
   try {
-    // Verificar que hay un perfil seleccionado
     if (!currentProfile.value) {
       router.push('/manager/profiles')
       return
@@ -57,10 +109,8 @@ async function handleLogout() {
   }
 }
 
-// Recargar watchlist cuando cambia el perfil
 watch(() => currentProfile.value?.id, async (newProfileId, oldProfileId) => {
   if (newProfileId && oldProfileId && newProfileId !== oldProfileId) {
-    // El perfil cambió, recargar watchlist
     clearCache()
     await loadWatchlist()
   }
@@ -75,7 +125,6 @@ onMounted(async () => {
   
   const profile = await loadProfile()
   if (!profile) {
-    // Si no hay perfil, redirigir a selección de perfiles
     router.push('/manager/profiles')
     return
   }
@@ -94,11 +143,19 @@ onMounted(async () => {
           <nav class="nav-links">
             <a @click="router.push('/home')" class="nav-link">Inicio</a>
             <a @click="router.push('/categories')" class="nav-link">Explorar</a>
-            <a href="#noticias" class="nav-link">Noticias</a>
+            <a @click="router.push('/analytics')" class="nav-link">Analytics</a>
           </nav>
         </div>
         <div class="header-right">
-          <button class="btn-search">
+          <!-- Hamburger menu button (mobile) -->
+          <button class="btn-hamburger" @click="toggleMobileMenu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <button class="btn-search" @click="toggleSearch">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"></circle>
               <path d="m21 21-4.35-4.35"></path>
@@ -136,7 +193,80 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
+      <!-- Mobile Navigation Menu -->
+      <div class="mobile-menu" :class="{ open: mobileMenuOpen }">
+        <div class="mobile-menu-header">
+          <img src="/Logo_AniToki.png" alt="AniToki" class="logo" />
+          <button class="btn-close" @click="toggleMobileMenu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <nav class="mobile-nav-links">
+          <a @click="router.push('/home'); toggleMobileMenu()" class="mobile-nav-link">Inicio</a>
+          <a @click="router.push('/categories'); toggleMobileMenu()" class="mobile-nav-link">Explorar</a>
+          <a @click="router.push('/analytics'); toggleMobileMenu()" class="mobile-nav-link">Analytics</a>
+          <a @click="router.push('/my-list'); toggleMobileMenu()" class="mobile-nav-link active">Mi Lista</a>
+          <a v-if="currentUser?.username === 'admin'" @click="router.push('/backoffice'); toggleMobileMenu()" class="mobile-nav-link">Gestión</a>
+        </nav>
+        <div class="mobile-menu-footer">
+          <button v-if="currentUser" @click="handleLogout; toggleMobileMenu()" class="btn-logout-mobile">
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+      <div v-if="mobileMenuOpen" class="mobile-menu-overlay" @click="toggleMobileMenu"></div>
     </header>
+
+    <!-- Search Overlay -->
+    <div class="search-container" :class="{ 'search-open': searchOpen }">
+      <div class="search-bar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.35-4.35"></path>
+        </svg>
+        <input 
+          type="text" 
+          v-model="searchQuery"
+          @input="performSearch"
+          class="search-input" 
+          placeholder="Buscar animes..."
+        />
+        <button class="search-close" @click="toggleSearch">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="search-results" v-if="searchQuery">
+        <div v-if="isSearching" class="search-loading">
+          <div class="spinner"></div>
+          <p>Buscando...</p>
+        </div>
+        <div v-else-if="searchResults.length > 0" class="search-results-list">
+          <div 
+            v-for="anime in searchResults" 
+            :key="anime.id"
+            class="search-result-item"
+            @click="goToAnime(anime.id)"
+          >
+            <img :src="anime.cover_image" :alt="anime.title" class="result-image" />
+            <div class="result-info">
+              <h4 class="result-title">{{ anime.title }}</h4>
+              <p class="result-meta">{{ anime.year }} • {{ anime.genre }}</p>
+            </div>
+          </div>
+        </div>
+        <div v-else class="search-no-results">
+          <p>No se encontraron resultados para "{{ searchQuery }}"</p>
+        </div>
+      </div>
+    </div>
 
     <!-- Hero Section -->
     <section class="hero-section">
@@ -457,18 +587,13 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .header-content {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .header-left {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
   .nav-links {
-    gap: 1rem;
+    display: none;
+  }
+
+  .btn-admin,
+  .btn-watchlist {
+    display: none;
   }
 
   .hero-title {
@@ -478,6 +603,251 @@ onMounted(async () => {
   .animes-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 1rem;
+  }
+}
+
+/* Mobile Menu Styles */
+.btn-hamburger {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 80%;
+  max-width: 350px;
+  height: 100vh;
+  background: linear-gradient(to bottom, #1a1a1f, #0a0a0a);
+  z-index: 200;
+  transition: right 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -5px 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.mobile-menu.open {
+  right: 0;
+}
+
+.mobile-menu-header {
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: transform 0.2s;
+}
+
+.btn-close:hover {
+  transform: rotate(90deg);
+}
+
+.mobile-nav-links {
+  flex: 1;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mobile-nav-link {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  font-size: 1.1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.mobile-nav-link:hover,
+.mobile-nav-link.active {
+  background: rgba(168, 85, 247, 0.1);
+  color: #fff;
+}
+
+.mobile-menu-footer {
+  padding: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-logout-mobile {
+  width: 100%;
+  padding: 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-logout-mobile:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 150;
+  backdrop-filter: blur(4px);
+}
+
+/* Search Overlay */
+.search-container {
+  position: fixed;
+  top: -100%;
+  left: 0;
+  right: 0;
+  background: rgba(10, 10, 10, 0.98);
+  z-index: 110;
+  padding: 2rem;
+  max-height: 80vh;
+  overflow-y: auto;
+  transition: top 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.search-container.search-open {
+  top: 0;
+}
+
+.search-bar {
+  max-width: 800px;
+  margin: 0 auto 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+}
+
+.search-icon {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.2rem;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.search-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: color 0.2s;
+}
+
+.search-close:hover {
+  color: #fff;
+}
+
+.search-results {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.search-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.search-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.search-result-item {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.search-result-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
+  transform: translateX(4px);
+}
+
+.result-image {
+  width: 60px;
+  height: 85px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.result-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.result-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+  color: #fff;
+}
+
+.result-meta {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.search-no-results {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 768px) {
+  .btn-hamburger {
+    display: block;
   }
 }
 </style>
