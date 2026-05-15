@@ -15,10 +15,26 @@ const episodes = ref([])
 const isLoading = ref(true)
 const isSaved = ref(false)
 const mobileMenuOpen = ref(false)
+const animeProgress = ref({
+  current_episode: 0,
+  watched: false,
+})
 
 const EPISODES_PER_SEASON = 24
 const selectedSeason = ref(1)
 const seasonDropdownOpen = ref(false)
+const ONE_PIECE_SEASONS = [
+  'East Blue',
+  'Entrada a Grand Line',
+  'Drum Island',
+  'Arabasta',
+  'Sueños',
+  'Skypiea',
+  'Fortaleza Naval G-8',
+  'Water 7',
+  'Enies Lobby',
+  'Thriller Bark'
+]
 
 // Search functionality
 const searchOpen = ref(false)
@@ -75,6 +91,7 @@ watch(() => currentProfile.value?.id, async (newProfileId, oldProfileId) => {
   if (newProfileId && oldProfileId && newProfileId !== oldProfileId) {
     // El perfil cambió, recargar watchlist status
     await checkIfSaved()
+    await loadAnimeProgress()
   }
 })
 
@@ -83,6 +100,7 @@ onMounted(async () => {
   await loadProfile()
   await loadAnimeDetails()
   await loadEpisodes()
+  await loadAnimeProgress()
   await checkIfSaved()
 })
 
@@ -121,6 +139,33 @@ async function checkIfSaved() {
   } catch (error) {
     console.error('Error checking watchlist:', error)
   }
+}
+
+async function loadAnimeProgress() {
+  try {
+    const profileId = currentProfile.value?.id
+    const query = profileId ? `?profile_id=${profileId}` : ''
+    const response = await authenticatedFetch(`/api/backoffice/progress/${animeId.value}/${query}`)
+
+    if (response.ok) {
+      const data = await response.json()
+      animeProgress.value = {
+        current_episode: Number(data.current_episode) || 0,
+        watched: Boolean(data.watched),
+      }
+    }
+  } catch (error) {
+    console.error('Error loading anime progress:', error)
+    animeProgress.value = {
+      current_episode: 0,
+      watched: false,
+    }
+  }
+}
+
+function isEpisodeWatched(episodeNumber) {
+  if (animeProgress.value.watched) return true
+  return episodeNumber <= animeProgress.value.current_episode
 }
 
 async function toggleSave() {
@@ -175,12 +220,43 @@ function selectSeason(seasonNumber) {
   seasonDropdownOpen.value = false
 }
 
+const isOnePieceAnime = computed(() => {
+  const slug = (anime.value?.anime_slug || '').toLowerCase()
+  const title = (anime.value?.title || '').toLowerCase()
+  return slug === 'one-piece' || title.includes('one piece') || anime.value?.id === 6
+})
+
 const seasonOptions = computed(() => {
   if (!episodes.value.length) return []
 
   const sortedEpisodes = [...episodes.value].sort((a, b) => a.episode_number - b.episode_number)
-  const totalSeasons = Math.ceil(sortedEpisodes.length / EPISODES_PER_SEASON)
 
+  if (isOnePieceAnime.value) {
+    const groups = Math.min(ONE_PIECE_SEASONS.length, sortedEpisodes.length)
+    const base = Math.floor(sortedEpisodes.length / groups)
+    const remainder = sortedEpisodes.length % groups
+    let start = 0
+
+    return Array.from({ length: groups }, (_, index) => {
+      const size = base + (index < remainder ? 1 : 0)
+      const end = start + size
+      const seasonEpisodes = sortedEpisodes.slice(start, end)
+      const startEpisode = seasonEpisodes[0]?.episode_number
+      const endEpisode = seasonEpisodes[seasonEpisodes.length - 1]?.episode_number
+      const option = {
+        number: index + 1,
+        label: ONE_PIECE_SEASONS[index],
+        range: `${startEpisode}-${endEpisode}`,
+        count: seasonEpisodes.length,
+        startIndex: start,
+        endIndex: end,
+      }
+      start = end
+      return option
+    })
+  }
+
+  const totalSeasons = Math.ceil(sortedEpisodes.length / EPISODES_PER_SEASON)
   return Array.from({ length: totalSeasons }, (_, index) => {
     const seasonNumber = index + 1
     const startIndex = index * EPISODES_PER_SEASON
@@ -191,8 +267,10 @@ const seasonOptions = computed(() => {
     return {
       number: seasonNumber,
       label: `Temporada ${seasonNumber}`,
-      range: `E${startEpisode} - E${endEpisode}`,
+      range: `${startEpisode}-${endEpisode}`,
       count: endIndex - startIndex,
+      startIndex,
+      endIndex,
     }
   })
 })
@@ -204,16 +282,12 @@ const selectedSeasonData = computed(() => {
 const filteredEpisodes = computed(() => {
   if (!episodes.value.length || !selectedSeasonData.value) return []
 
-  const seasonIndex = selectedSeason.value - 1
-  const startIndex = seasonIndex * EPISODES_PER_SEASON
-  const endIndex = startIndex + EPISODES_PER_SEASON
-
   return [...episodes.value]
     .sort((a, b) => a.episode_number - b.episode_number)
-    .slice(startIndex, endIndex)
+    .slice(selectedSeasonData.value.startIndex, selectedSeasonData.value.endIndex)
 })
 
-watch(episodes, () => {
+watch([episodes, anime], () => {
   if (seasonOptions.value.length > 0) {
     selectedSeason.value = seasonOptions.value[0].number
   }
@@ -306,7 +380,7 @@ const genresList = computed(() => {
           <a v-if="currentUser?.username === 'admin'" @click="router.push('/backoffice'); toggleMobileMenu()" class="mobile-nav-link">Gestión</a>
         </nav>
         <div class="mobile-menu-footer">
-          <button v-if="currentUser" @click="handleLogout; toggleMobileMenu()" class="btn-logout-mobile">
+          <button v-if="currentUser" @click="handleLogout(); toggleMobileMenu()" class="btn-logout-mobile">
             Cerrar Sesión
           </button>
         </div>
@@ -432,8 +506,8 @@ const genresList = computed(() => {
                   :class="{ active: selectedSeason === season.number }"
                   @click="selectSeason(season.number)"
                 >
-                  <span class="season-option-title">{{ season.label }}</span>
-                  <span class="season-option-meta">{{ season.range }} • {{ season.count }} eps</span>
+                  <span class="season-option-title">{{ season.label }} ({{ season.range }})</span>
+                  <span class="season-option-meta">{{ season.count }} Episodios</span>
                 </button>
               </div>
             </div>
@@ -456,6 +530,9 @@ const genresList = computed(() => {
             >
               <div class="episode-thumbnail">
                 <img :src="episode.thumbnail || anime.cover_image" :alt="episode.title" />
+                <div v-if="isEpisodeWatched(episode.episode_number)" class="episode-seen-overlay">
+                  <span class="seen-pill">VISTO</span>
+                </div>
                 <div class="play-overlay">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -1080,6 +1157,29 @@ const genresList = computed(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.episode-seen-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 0.65rem;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.seen-pill {
+  background: rgba(147, 51, 234, 0.92);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 .play-overlay {

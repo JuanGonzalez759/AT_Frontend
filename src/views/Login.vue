@@ -183,6 +183,11 @@ onMounted(() => {
   transition: transform 220ms ease, background-color 220ms ease;
 }
 
+.input-wrap:hover .underline {
+  transform: scaleX(1);
+  background-color: #812e96;
+}
+
 .input-wrap.activating .underline {
   transform: scaleX(1);
   background-color: #812e96;

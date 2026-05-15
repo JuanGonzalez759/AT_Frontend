@@ -421,7 +421,7 @@ onMounted(async () => {
           <a @click="goToTestWatch(); toggleMobileMenu()" class="mobile-nav-link">Reproductor</a>
         </nav>
         <div class="mobile-menu-footer">
-          <button v-if="currentUser" @click="handleLogout; toggleMobileMenu()" class="btn-logout-mobile">
+          <button v-if="currentUser" @click="handleLogout(); toggleMobileMenu()" class="btn-logout-mobile">
             Cerrar Sesión
           </button>
         </div>

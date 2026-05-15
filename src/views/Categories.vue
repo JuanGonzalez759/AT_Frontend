@@ -266,7 +266,7 @@ onMounted(async () => {
           <a v-if="currentUser?.username === 'admin'" @click="router.push('/backoffice'); toggleMobileMenu()" class="mobile-nav-link">Gestión</a>
         </nav>
         <div class="mobile-menu-footer">
-          <button v-if="currentUser" @click="handleLogout; toggleMobileMenu()" class="btn-logout-mobile">
+          <button v-if="currentUser" @click="handleLogout(); toggleMobileMenu()" class="btn-logout-mobile">
             Cerrar Sesión
           </button>
         </div>
