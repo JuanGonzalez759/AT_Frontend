@@ -23,6 +23,7 @@ const animeProgress = ref({
 const EPISODES_PER_SEASON = 24
 const selectedSeason = ref(1)
 const seasonDropdownOpen = ref(false)
+const descriptionExpanded = ref(false)
 const ONE_PIECE_SEASONS = [
   'East Blue',
   'Entrada a Grand Line',
@@ -215,6 +216,10 @@ function toggleSeasonDropdown() {
   seasonDropdownOpen.value = !seasonDropdownOpen.value
 }
 
+function toggleDescriptionExpanded() {
+  descriptionExpanded.value = !descriptionExpanded.value
+}
+
 function selectSeason(seasonNumber) {
   selectedSeason.value = seasonNumber
   seasonDropdownOpen.value = false
@@ -297,6 +302,31 @@ watch([episodes, anime], () => {
 const genresList = computed(() => {
   if (!anime.value?.genre) return []
   return anime.value.genre.split(',').map(g => g.trim())
+})
+
+const truncatedDescription = computed(() => {
+  if (!anime.value?.description) return ''
+  const maxLength = 280
+  const description = anime.value.description
+  if (description.length > maxLength) {
+    return description.substring(0, maxLength) + '...'
+  }
+  return description
+})
+
+const displayedDescription = computed(() => {
+  return descriptionExpanded.value ? anime.value?.description : truncatedDescription.value
+})
+
+const showSeeMore = computed(() => {
+  return anime.value?.description && anime.value.description.length > 280
+})
+
+const heroBackgroundImage = computed(() => {
+  if (isOnePieceAnime.value) {
+    return '/one-piece-logo'
+  }
+  return anime.value?.background_image || anime.value?.cover_image
 })
 </script>
 
@@ -444,7 +474,7 @@ const genresList = computed(() => {
     <!-- Anime Content -->
     <main v-else-if="anime" class="main-content">
       <!-- Hero Section -->
-      <div class="hero-section" :style="{ backgroundImage: `url(${anime.background_image || anime.cover_image})` }">
+      <div class="hero-section" :style="{ backgroundImage: `url(${heroBackgroundImage})` }">
         <div class="hero-overlay"></div>
         <div class="hero-content">
           <div class="hero-info">
@@ -463,7 +493,10 @@ const genresList = computed(() => {
               <div class="hero-genres">
                 <span v-for="genre in genresList" :key="genre" class="genre-tag">{{ genre }}</span>
               </div>
-              <p class="hero-description">{{ anime.description }}</p>
+              <p class="hero-description">{{ displayedDescription }}</p>
+              <button v-if="showSeeMore" class="btn-see-more" @click="toggleDescriptionExpanded">
+                {{ descriptionExpanded ? 'Ver menos' : 'Ver más' }}
+              </button>
               <div class="hero-actions">
                 <button class="btn-play" @click="playNextEpisode" v-if="episodes.length > 0">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -900,16 +933,18 @@ const genresList = computed(() => {
 
 .hero-info {
   display: flex;
-  gap: 2.5rem;
-  align-items: flex-start;
+  gap: 3rem;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .hero-poster {
-  width: 250px;
-  height: 350px;
+  width: 220px;
+  height: 320px;
   object-fit: cover;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  flex-shrink: 0;
 }
 
 .hero-details {
@@ -959,11 +994,33 @@ const genresList = computed(() => {
 }
 
 .hero-description {
-  font-size: 1.05rem;
+  font-size: 1rem;
   line-height: 1.6;
   color: var(--color-text-secondary);
-  margin-bottom: 2rem;
-  max-width: 800px;
+  margin-bottom: 1.5rem;
+  max-width: 750px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-see-more {
+  background: transparent;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0;
+  margin-bottom: 1.5rem;
+  transition: color 0.2s ease;
+}
+
+.btn-see-more:hover {
+  color: var(--color-primary-light);
+  text-decoration: underline;
 }
 
 .hero-actions {
@@ -997,14 +1054,16 @@ const genresList = computed(() => {
 }
 
 .btn-save {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
   color: #fff;
 }
 
 .btn-save:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
 }
 
 /* Episodes Section */
@@ -1470,6 +1529,21 @@ const genresList = computed(() => {
 
   .hero-actions {
     justify-content: center;
+  }
+
+  .hero-info {
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .hero-poster {
+    width: 180px;
+    height: 260px;
+  }
+
+  .hero-description {
+    max-width: 100%;
   }
 
   .episodes-header {
