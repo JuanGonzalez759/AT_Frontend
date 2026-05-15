@@ -302,6 +302,7 @@ const genresList = computed(() => {
         </div>
       </div>
     </div>
+    <div v-if="searchOpen" class="search-backdrop" @click="toggleSearch"></div>
 
     <!-- Loading State -->
     <div v-if="isLoading" class="loading-container">
@@ -452,22 +453,27 @@ const genresList = computed(() => {
   cursor: pointer;
 }
 
+.logo:hover {
+  transform: scale(1.05);
+}
+
 .nav-links {
   display: flex;
   gap: 2rem;
 }
 
 .nav-link {
-  color: var(--color-text-primary);
+  color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
   font-size: 0.95rem;
   font-weight: 500;
-  transition: color 0.2s ease;
-  position: relative;
+  transition: color 0.2s;
+  cursor: pointer;
 }
 
-.nav-link:hover {
-  color: var(--color-primary-light);
+.nav-link:hover,
+.nav-link.active {
+  color: #fff;
 }
 
 .header-right {
@@ -476,61 +482,31 @@ const genresList = computed(() => {
   gap: 1rem;
 }
 
-.btn-search {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--color-text-primary);
-  padding: 0.6rem;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-search:hover {
-  background: rgba(147, 51, 234, 0.1);
-  border-color: var(--color-primary);
-}
-
+.btn-search,
+.btn-admin,
 .btn-watchlist {
-  background: transparent;
-  border: 1.5px solid var(--color-primary);
-  color: var(--color-primary);
-  padding: 0.6rem 1.5rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-watchlist:hover {
-  background: var(--color-primary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
-}
-
-.btn-admin {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  border: none;
-  color: #fff;
-  padding: 0.6rem 1.5rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 0.2s;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: all 0.2s ease;
+  font-size: 0.9rem;
 }
 
-.btn-admin:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+.btn-search {
+  padding: 0.6rem;
+}
+
+.btn-search:hover,
+.btn-admin:hover,
+.btn-watchlist:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .user-controls {
@@ -1026,132 +1002,161 @@ const genresList = computed(() => {
 /* Search Overlay */
 .search-container {
   position: fixed;
-  top: -100%;
-  left: 0;
-  right: 0;
-  background: rgba(10, 10, 10, 0.98);
-  z-index: 110;
-  padding: 2rem;
-  max-height: 80vh;
-  overflow-y: auto;
-  transition: top 0.3s ease;
-  backdrop-filter: blur(10px);
+  top: 0;
+  right: -600px;
+  width: 550px;
+  max-width: 90vw;
+  height: 100vh;
+  background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+  z-index: 1001;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(147, 51, 234, 0.2);
 }
 
 .search-container.search-open {
-  top: 0;
+  right: 0;
 }
 
 .search-bar {
-  max-width: 800px;
-  margin: 0 auto 2rem;
+  padding: 1.5rem;
+  background: rgba(20, 20, 20, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 1rem 1.5rem;
+  backdrop-filter: blur(10px);
 }
 
 .search-icon {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--color-primary);
+  flex-shrink: 0;
 }
 
 .search-input {
   flex: 1;
-  background: transparent;
-  border: none;
-  color: #fff;
-  font-size: 1.2rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-text-primary);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
   outline: none;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
 }
 
 .search-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .search-close {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   padding: 0.5rem;
-  transition: color 0.2s;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .search-close:hover {
-  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-primary);
 }
 
 .search-results {
-  max-width: 800px;
-  margin: 0 auto;
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
 }
 
 .search-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 1rem;
-  padding: 2rem;
-  color: rgba(255, 255, 255, 0.7);
+  padding: 3rem 1rem;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .search-results-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .search-result-item {
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .search-result-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(168, 85, 247, 0.5);
-  transform: translateX(4px);
+  background: rgba(147, 51, 234, 0.1);
+  border-color: var(--color-primary);
+  transform: translateX(-4px);
 }
 
 .result-image {
-  width: 60px;
-  height: 85px;
+  width: 80px;
+  height: 110px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .result-info {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 0.5rem;
 }
 
 .result-title {
   font-size: 1rem;
   font-weight: 600;
-  margin: 0 0 0.25rem;
-  color: #fff;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.3;
 }
 
 .result-meta {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.6);
   margin: 0;
 }
 
 .search-no-results {
   text-align: center;
-  padding: 3rem 2rem;
+  padding: 3rem 1rem;
   color: rgba(255, 255, 255, 0.5);
+  font-size: 0.95rem;
+}
+
+.search-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  backdrop-filter: blur(4px);
 }
 
 /* Responsive */
@@ -1199,6 +1204,26 @@ const genresList = computed(() => {
   .footer-content {
     flex-direction: column;
     gap: 1rem;
+  }
+
+  .search-container {
+    width: 100vw;
+    max-width: 100vw;
+    right: -100vw;
+  }
+
+  .result-image {
+    width: 60px;
+    height: 85px;
+  }
+
+  .result-title {
+    font-size: 0.9rem;
+  }
+
+  .result-meta {
+    font-size: 0.75rem;
+    flex-wrap: wrap;
   }
 }
 </style>
