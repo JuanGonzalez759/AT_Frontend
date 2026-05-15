@@ -31,7 +31,6 @@ async function loadAnimes() {
       const data = await response.json()
       // La API devuelve un objeto paginado con results
       animes.value = data.results || data
-      console.log('Animes cargados:', animes.value.length)
     } else {
       console.error('Error al cargar animes:', response.status, response.statusText)
       const errorData = await response.text()
