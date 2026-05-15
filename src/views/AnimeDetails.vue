@@ -144,7 +144,13 @@ async function loadEpisodes() {
 
 async function checkIfSaved() {
   try {
-    const response = await authenticatedFetch('/api/manager/watchlist/')
+    const profileId = currentProfile.value?.id
+    if (!profileId) {
+      isSaved.value = false
+      return
+    }
+
+    const response = await authenticatedFetch(`/api/manager/watchlist/?profile_id=${profileId}`)
     if (response.ok) {
       const data = await response.json()
       isSaved.value = data.some(item => item.anime.id === parseInt(animeId.value))
@@ -183,12 +189,13 @@ function isEpisodeWatched(episodeNumber) {
 
 async function toggleSave() {
   try {
+    const profileId = currentProfile.value?.id
+    if (!profileId) return
+
     if (isSaved.value) {
       // Remove from watchlist
-      const response = await authenticatedFetch('/api/manager/watchlist/', {
+      const response = await authenticatedFetch(`/api/manager/watchlist/remove/${parseInt(animeId.value)}/?profile_id=${profileId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ anime_id: parseInt(animeId.value) })
       })
       if (response.ok) {
         isSaved.value = false
@@ -198,7 +205,10 @@ async function toggleSave() {
       const response = await authenticatedFetch('/api/manager/watchlist/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ anime_id: parseInt(animeId.value) })
+        body: JSON.stringify({
+          anime_id: parseInt(animeId.value),
+          profile_id: profileId,
+        })
       })
       if (response.ok) {
         isSaved.value = true
