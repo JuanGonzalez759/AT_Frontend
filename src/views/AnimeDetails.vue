@@ -493,7 +493,7 @@ const heroBackgroundImage = computed(() => {
               <div class="hero-genres">
                 <span v-for="genre in genresList" :key="genre" class="genre-tag">{{ genre }}</span>
               </div>
-              <p class="hero-description">{{ displayedDescription }}</p>
+              <p :class="['hero-description', { 'expanded': descriptionExpanded }]">{{ displayedDescription }}</p>
               <button v-if="showSeeMore" class="btn-see-more" @click="toggleDescriptionExpanded">
                 {{ descriptionExpanded ? 'Ver menos' : 'Ver más' }}
               </button>
@@ -1004,6 +1004,12 @@ const heroBackgroundImage = computed(() => {
   -webkit-line-clamp: 3;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.hero-description.expanded {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  display: block;
 }
 
 .btn-see-more {
