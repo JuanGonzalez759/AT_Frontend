@@ -16,6 +16,10 @@ const isLoading = ref(true)
 const isSaved = ref(false)
 const mobileMenuOpen = ref(false)
 
+const EPISODES_PER_SEASON = 24
+const selectedSeason = ref(1)
+const seasonDropdownOpen = ref(false)
+
 // Search functionality
 const searchOpen = ref(false)
 const searchQuery = ref('')
@@ -161,6 +165,60 @@ function handleLogout() {
   logout()
   router.push('/login')
 }
+
+function toggleSeasonDropdown() {
+  seasonDropdownOpen.value = !seasonDropdownOpen.value
+}
+
+function selectSeason(seasonNumber) {
+  selectedSeason.value = seasonNumber
+  seasonDropdownOpen.value = false
+}
+
+const seasonOptions = computed(() => {
+  if (!episodes.value.length) return []
+
+  const sortedEpisodes = [...episodes.value].sort((a, b) => a.episode_number - b.episode_number)
+  const totalSeasons = Math.ceil(sortedEpisodes.length / EPISODES_PER_SEASON)
+
+  return Array.from({ length: totalSeasons }, (_, index) => {
+    const seasonNumber = index + 1
+    const startIndex = index * EPISODES_PER_SEASON
+    const endIndex = Math.min(startIndex + EPISODES_PER_SEASON, sortedEpisodes.length)
+    const startEpisode = sortedEpisodes[startIndex]?.episode_number
+    const endEpisode = sortedEpisodes[endIndex - 1]?.episode_number
+
+    return {
+      number: seasonNumber,
+      label: `Temporada ${seasonNumber}`,
+      range: `E${startEpisode} - E${endEpisode}`,
+      count: endIndex - startIndex,
+    }
+  })
+})
+
+const selectedSeasonData = computed(() => {
+  return seasonOptions.value.find((season) => season.number === selectedSeason.value) || null
+})
+
+const filteredEpisodes = computed(() => {
+  if (!episodes.value.length || !selectedSeasonData.value) return []
+
+  const seasonIndex = selectedSeason.value - 1
+  const startIndex = seasonIndex * EPISODES_PER_SEASON
+  const endIndex = startIndex + EPISODES_PER_SEASON
+
+  return [...episodes.value]
+    .sort((a, b) => a.episode_number - b.episode_number)
+    .slice(startIndex, endIndex)
+})
+
+watch(episodes, () => {
+  if (seasonOptions.value.length > 0) {
+    selectedSeason.value = seasonOptions.value[0].number
+  }
+  seasonDropdownOpen.value = false
+})
 
 const genresList = computed(() => {
   if (!anime.value?.genre) return []
@@ -355,15 +413,43 @@ const genresList = computed(() => {
       <!-- Episodes Section -->
       <section class="episodes-section">
         <div class="container">
-          <h2 class="section-title">Episodios ({{ episodes.length }})</h2>
-          
+          <div class="episodes-header">
+            <h2 class="section-title">Episodios ({{ filteredEpisodes.length }})</h2>
+
+            <div v-if="seasonOptions.length > 0" class="season-filter">
+              <button class="season-dropdown-btn" @click="toggleSeasonDropdown">
+                <span>{{ selectedSeasonData?.label || 'Temporada 1' }}</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="{ 'rotated': seasonDropdownOpen }">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+
+              <div v-if="seasonDropdownOpen" class="season-dropdown-menu">
+                <button
+                  v-for="season in seasonOptions"
+                  :key="season.number"
+                  class="season-option"
+                  :class="{ active: selectedSeason === season.number }"
+                  @click="selectSeason(season.number)"
+                >
+                  <span class="season-option-title">{{ season.label }}</span>
+                  <span class="season-option-meta">{{ season.range }} • {{ season.count }} eps</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div v-if="episodes.length === 0" class="no-episodes">
             <p>No hay episodios disponibles para este anime.</p>
           </div>
 
+          <div v-else-if="filteredEpisodes.length === 0" class="no-episodes">
+            <p>No hay episodios en esta temporada.</p>
+          </div>
+
           <div v-else class="episodes-grid">
-            <div 
-              v-for="episode in episodes" 
+            <div
+              v-for="episode in filteredEpisodes"
               :key="episode.id"
               class="episode-card"
               @click="playEpisode(episode.episode_number)"
@@ -856,11 +942,100 @@ const genresList = computed(() => {
   padding: 0 2.5rem;
 }
 
+.episodes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
 .section-title {
   font-size: 1.75rem;
   font-weight: 700;
-  margin-bottom: 2rem;
+  margin: 0;
   color: #fff;
+}
+
+.season-filter {
+  position: relative;
+}
+
+.season-dropdown-btn {
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.season-dropdown-btn:hover {
+  border-color: var(--color-primary);
+  background: rgba(147, 51, 234, 0.15);
+}
+
+.season-dropdown-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.season-dropdown-btn svg.rotated {
+  transform: rotate(180deg);
+}
+
+.season-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: 280px;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 20;
+  background: rgba(20, 20, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  padding: 0.4rem;
+}
+
+.season-option {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  padding: 0.7rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  transition: background 0.2s ease;
+}
+
+.season-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.season-option.active {
+  background: rgba(147, 51, 234, 0.2);
+  border: 1px solid rgba(147, 51, 234, 0.35);
+}
+
+.season-option-title {
+  font-weight: 600;
+}
+
+.season-option-meta {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
 }
 
 .no-episodes {
@@ -1195,6 +1370,20 @@ const genresList = computed(() => {
 
   .hero-actions {
     justify-content: center;
+  }
+
+  .episodes-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .season-dropdown-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .season-dropdown-menu {
+    width: 100%;
   }
 
   .episodes-grid {
