@@ -96,6 +96,18 @@ watch(() => currentProfile.value?.id, async (newProfileId, oldProfileId) => {
   }
 })
 
+// Recargar datos cuando cambia el anime ID en la ruta
+watch(() => route.params.id, async (newAnimeId) => {
+  if (newAnimeId) {
+    animeId.value = newAnimeId
+    isLoading.value = true
+    await loadAnimeDetails()
+    await loadEpisodes()
+    await loadAnimeProgress()
+    await checkIfSaved()
+  }
+})
+
 onMounted(async () => {
   await loadCurrentUser()
   await loadProfile()
