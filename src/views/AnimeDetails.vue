@@ -324,7 +324,7 @@ const showSeeMore = computed(() => {
 
 const heroBackgroundImage = computed(() => {
   if (isOnePieceAnime.value) {
-    return '/one-piece-logo'
+    return '/backgrounds/one-piece-hero.png'
   }
   return anime.value?.background_image || anime.value?.cover_image
 })
@@ -916,9 +916,9 @@ const heroBackgroundImage = computed(() => {
   position: absolute;
   inset: 0;
   background: linear-gradient(to bottom, 
-    rgba(10, 10, 10, 0.4) 0%,
-    rgba(10, 10, 10, 0.8) 60%,
-    rgba(10, 10, 10, 1) 100%
+    rgba(10, 10, 10, 0.2) 0%,
+    rgba(10, 10, 10, 0.5) 60%,
+    rgba(10, 10, 10, 0.8) 100%
   );
 }
 
