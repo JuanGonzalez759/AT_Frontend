@@ -1282,34 +1282,6 @@ function goHome() {
         <div class="footer-logo" @click="goHome">
           <img src="/Logo_AniToki.png" alt="AniToki" class="logo-image" />
         </div>
-
-        <div class="footer-section">
-          <h3>Explorar</h3>
-          <ul>
-            <li @click="goHome">Explorar la más popular</li>
-            <li>Novedades</li>
-          </ul>
-        </div>
-
-        <div class="footer-section">
-          <h3>Recursos</h3>
-          <ul>
-            <li>Socios</li>
-            <li>Centro de ayuda</li>
-          </ul>
-        </div>
-
-        <div class="footer-section">
-          <h3>Cuenta</h3>
-          <ul>
-            <li>Nueva Premium</li>
-            <li @click="router.push('/choose-profile')">Cambiar perfil</li>
-            <li>Favoritos</li>
-            <li>Tareas</li>
-            <li>Historial</li>
-            <li>Mi Cuenta</li>
-          </ul>
-        </div>
       </div>
 
       <div class="footer-bottom">

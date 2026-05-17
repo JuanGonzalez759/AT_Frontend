@@ -610,11 +610,6 @@ const heroBackgroundImage = computed(() => {
     <footer class="footer">
       <div class="footer-content">
         <p>&copy; 2026 AniToki. Todos los derechos reservados.</p>
-        <div class="footer-links">
-          <a href="#">Términos</a>
-          <a href="#">Privacidad</a>
-          <a href="#">Contacto</a>
-        </div>
       </div>
     </footer>
   </div>
