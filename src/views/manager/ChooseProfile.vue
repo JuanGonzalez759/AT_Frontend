@@ -30,14 +30,14 @@ const availableAvatars = ref([
 ])
 
 const availableBackgrounds = ref([
-  { name: 'One Piece', url: 'https://imgs.search.brave.com/PL9srwfIfH53eZatSvM12DTYcYznYqBPjZe6RRWtVvg/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly93YWxs/cGFwZXJjYXQuY29t/L3cvZnVsbC8zLzMv/Ni8xMjY5MzctMzg0/MHgyMTYwLWRlc2t0/b3AtNGstb25lLXBp/ZWNlLWJhY2tncm91/bmQtaW1hZ2UuanBn' },
-  { name: 'Attack on Titan', url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=1600&h=900&fit=crop' },
-  { name: 'Demon Slayer', url: 'https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=1600&h=900&fit=crop' },
-  { name: 'Jujutsu Kaisen', url: 'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=1600&h=900&fit=crop' },
-  { name: 'My Hero Academia', url: 'https://images.unsplash.com/photo-1612198188060-c7c2a3b66eae?w=1600&h=900&fit=crop' },
-  { name: 'Naruto', url: 'https://images.unsplash.com/photo-1606947884439-f9f064c0f3f6?w=1600&h=900&fit=crop' },
-  { name: 'Dragon Ball', url: 'https://images.unsplash.com/photo-1555864326-5cf22ef123cf?w=1600&h=900&fit=crop' },
-  { name: 'Death Note', url: 'https://images.unsplash.com/photo-1618556450991-2f1af64e8191?w=1600&h=900&fit=crop' },
+  { name: 'One Piece', url: 'https://getwallpapers.com/wallpaper/full/0/2/4/1486340-one-piece-wallpaper-1920x1080-1920x1200-windows.jpg' },
+  { name: 'Attack on Titan', url: 'https://4kwallpapers.com/images/walls/thumbs_3t/10368.jpg' },
+  { name: 'Demon Slayer', url: 'https://4kwallpapers.com/images/walls/thumbs_3t/23615.jpg' },
+  { name: 'Jujutsu Kaisen', url: 'https://4kwallpapers.com/images/walls/thumbs_3t/25001.jpg' },
+  { name: 'My Hero Academia', url: 'https://4kwallpapers.com/images/walls/thumbs_3t/25013.jpg' },
+  { name: 'Naruto', url: 'https://4kwallpapers.com/images/walls/thumbs_3t/25560.png' },
+  { name: 'Dragon Ball', url: 'https://4kwallpapers.com/images/walls/thumbs_3t/21222.jpg' },
+  { name: 'Death Note', url: 'https://4kwallpapers.com/images/walls/thumbs_3t/10501.jpg' },
 ])
 
 const profiles = ref([])
