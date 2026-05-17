@@ -116,6 +116,8 @@ const videoError = ref(null)
 const videoProgress = ref(0)
 const videoDuration = ref(0)
 const isYouTubeVideo = ref(false)
+const isCloudinaryEmbed = ref(false)
+const cloudinaryEmbedUrl = ref('')
 const youtubeEmbedUrl = ref('')
 
 // Controles personalizados del reproductor
@@ -380,7 +382,9 @@ async function loadEpisodeSources() {
   isLoadingVideo.value = true
   videoError.value = null
   isYouTubeVideo.value = false
-  
+  isCloudinaryEmbed.value = false
+  cloudinaryEmbedUrl.value = ''
+
   try {
     // Verificar si el episodio tiene una URL directa de video (SOLO MP4, M3U8, no YouTube)
     if (currentEpisode.value.video_url) {
@@ -389,6 +393,15 @@ async function loadEpisodeSources() {
       // IGNORAR videos de YouTube - solo usar archivos de video reales
       const isYouTube = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')
       
+      const isCloudinaryPlayer = videoUrl.includes('player.cloudinary.com')
+
+      if (isCloudinaryPlayer) {
+        isCloudinaryEmbed.value = true
+        cloudinaryEmbedUrl.value = videoUrl
+        isLoadingVideo.value = false
+        return
+      }
+
       if (!isYouTube) {
         // Si es M3U8, cargar con HLS
         if (videoUrl.includes('.m3u8')) {
@@ -897,11 +910,21 @@ function goHome() {
           allowfullscreen
         ></iframe>
         
+        <!-- Cloudinary Embed Player -->
+        <iframe
+          v-if="isCloudinaryEmbed && cloudinaryEmbedUrl"
+          :src="cloudinaryEmbedUrl"
+          class="video-player"
+          frameborder="0"
+          allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+          allowfullscreen
+        ></iframe>
+
         <!-- Video Element HLS -->
         <video 
           ref="videoPlayer"
           class="video-player"
-          v-show="!isLoadingVideo && !videoError && !isYouTubeVideo"
+          v-show="!isLoadingVideo && !videoError && !isYouTubeVideo && !isCloudinaryEmbed"
           preload="metadata"
           :poster="anime?.cover_image || ''"
           @play="isPlaying = true"
@@ -914,7 +937,7 @@ function goHome() {
         
         <!-- Controles personalizados -->
         <div 
-          v-if="!isLoadingVideo && !videoError && !isYouTubeVideo" 
+          v-if="!isLoadingVideo && !videoError && !isYouTubeVideo && !isCloudinaryEmbed" 
           class="custom-controls"
           :class="{ 'show': showControls }"
           @mousemove="handleMouseMove"
