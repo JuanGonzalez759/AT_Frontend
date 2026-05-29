@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProfile } from '../composables/useProfile'
 import { useWatchlist } from '../composables/useWatchlist'
+import SaveToListModal from './SaveToListModal.vue'
 
 const props = defineProps({
   animeId: Number,
@@ -41,6 +42,7 @@ const { loadWatchlist, isInWatchlist, addToWatchlist, removeFromWatchlist } = us
 const emit = defineEmits(['show-info', 'watchlist-updated'])
 const isHovered = ref(false)
 const isSaved = ref(false)
+const showSaveModal = ref(false)
 
 function handleClick() {
   if (props.animeId) {
@@ -65,13 +67,13 @@ function emitShowInfo() {
 
 async function toggleSave(event) {
   event.stopPropagation() // Evitar que se active el click del card
-  
+
   // Verificar que hay un perfil seleccionado
   if (!currentProfile.value) {
     console.warn('No profile selected, cannot save to watchlist')
     return
   }
-  
+
   if (isSaved.value) {
     const success = await removeFromWatchlist(props.animeId)
     if (success) {
@@ -79,11 +81,20 @@ async function toggleSave(event) {
       emit('watchlist-updated')
     }
   } else {
-    const success = await addToWatchlist(props.animeId)
-    if (success) {
-      isSaved.value = true
-      emit('watchlist-updated')
-    }
+    // Open modal to choose list (Mi Lista or custom lists)
+    showSaveModal.value = true
+  }
+}
+
+function onModalClose() {
+  showSaveModal.value = false
+}
+
+function onModalAdded(payload) {
+  // If added to mi-lista, refresh watchlist status
+  if (payload?.to === 'mi-lista') {
+    isSaved.value = true
+    emit('watchlist-updated')
   }
 }
 
@@ -202,6 +213,14 @@ onMounted(() => {
       <h3 class="card-title">{{ title }}</h3>
       <p v-if="subtitle" class="card-subtitle">{{ subtitle }}</p>
     </div>
+    <SaveToListModal
+      :show="showSaveModal"
+      :animeId="props.animeId"
+      :title="props.title"
+      :image="props.image"
+      @close="onModalClose"
+      @added="onModalAdded"
+    />
   </div>
 </template>
 

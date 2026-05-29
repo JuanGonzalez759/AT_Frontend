@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useProfile } from '../composables/useProfile'
 import { useWatchlist } from '../composables/useWatchlist'
+import { useLists } from '../composables/useLists'
 import AnimeCard from '../components/AnimeCard.vue'
 
 const router = useRouter()
@@ -13,6 +14,83 @@ const { loadWatchlist: loadWatchlistData, clearCache } = useWatchlist()
 
 const watchlistAnimes = ref([])
 const isLoading = ref(true)
+
+// Lists (custom)
+const { getLists, createList, removeFromList, deleteList } = useLists()
+const customLists = ref([])
+const newListName = ref('')
+
+const animeCache = ref({})
+
+// Modal state for confirming destructive actions
+const confirmModal = ref({ open: false, message: '', onConfirm: null })
+
+function loadLists() {
+  customLists.value = getLists() || []
+  // fetch anime details for cached ids
+  const ids = new Set()
+  customLists.value.forEach(l => l.items.forEach(id => ids.add(id)))
+  ids.forEach(id => {
+    if (!animeCache.value[id]) fetchAnime(id)
+  })
+}
+
+const totalCustomItems = computed(() => {
+  return customLists.value.reduce((sum, l) => sum + (l.items?.length || 0), 0)
+})
+
+const hasAnySaved = computed(() => {
+  return watchlistAnimes.value.length > 0 || totalCustomItems.value > 0
+})
+
+async function fetchAnime(id) {
+  try {
+    const response = await authenticatedFetch(`/api/backoffice/public/animes/${id}/`)
+    if (response.ok) {
+      const data = await response.json()
+      animeCache.value[id] = data
+    }
+  } catch (e) {
+    console.error('Error fetching anime detail', e)
+  }
+}
+
+function handleCreateList() {
+  const name = newListName.value && newListName.value.trim()
+  if (!name) return
+  createList(name)
+  newListName.value = ''
+  loadLists()
+}
+
+function handleDeleteList(listId) {
+  if (!listId) return
+  // open custom confirm modal
+  confirmModal.value = {
+    open: true,
+    message: '¿Eliminar esta lista? Esta acción no se puede deshacer.',
+    onConfirm: async () => {
+      const ok = deleteList(listId)
+      confirmModal.value.open = false
+      if (ok) {
+        loadLists()
+      } else {
+        alert('No se pudo eliminar la lista')
+      }
+    }
+  }
+}
+
+function animeFor(id) {
+  return animeCache.value[id] || { id, title: 'Cargando...', cover_image: '/profiles/Profile1.png' }
+}
+
+function removeFromCustomList(listId, animeId) {
+  const ok = removeFromList(listId, animeId)
+  if (ok) {
+    loadLists()
+  }
+}
 
 // Mobile menu
 const mobileMenuOpen = ref(false)
@@ -116,6 +194,11 @@ watch(() => currentProfile.value?.id, async (newProfileId, oldProfileId) => {
   }
 })
 
+// reload custom lists when profile changes
+watch(() => currentProfile.value?.id, () => {
+  loadLists()
+})
+
 onMounted(async () => {
   const user = await loadCurrentUser()
   if (!user) {
@@ -130,6 +213,7 @@ onMounted(async () => {
   }
   
   await loadWatchlist()
+  loadLists()
 })
 </script>
 
@@ -279,12 +363,43 @@ onMounted(async () => {
 
     <!-- Watchlist Content -->
     <section class="watchlist-section">
+        <!-- Custom lists manager -->
+        <div class="lists-manager" style="max-width:1200px;margin:20px auto;padding:0 16px;">
+          <h3 style="color:#fff;margin-bottom:8px">Listas personalizadas</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input v-model="newListName" placeholder="Nombre de la nueva lista" style="padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#0b0b0b;color:#fff;flex:1" />
+            <button @click="handleCreateList" style="padding:8px 12px;border-radius:8px;background:#9333ea;border:none;color:#fff">Añadir lista</button>
+          </div>
+
+          <div v-if="customLists.length === 0" style="margin-top:12px;color:#aaa">No hay listas personalizadas aún.</div>
+
+          <div v-for="lst in customLists" :key="lst.id" style="margin-top:18px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+              <h4 style="margin:0;color:#fff">{{ lst.name }}</h4>
+              <span style="background:rgba(255,255,255,0.06);padding:4px 8px;border-radius:6px;color:#ddd">{{ lst.items.length }}</span>
+              <button @click="handleDeleteList(lst.id)" style="margin-left:8px;padding:6px 10px;border-radius:8px;background:#ef4444;border:none;color:#fff;cursor:pointer">Eliminar lista</button>
+            </div>
+
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+              <div v-for="aid in lst.items" :key="aid" style="position:relative;width:140px">
+                <img :src="animeFor(aid).cover_image" :alt="animeFor(aid).title" style="width:140px;height:210px;object-fit:cover;border-radius:8px;cursor:pointer" @click="router.push(`/anime/${aid}`)" />
+                <button @click="removeFromCustomList(lst.id, aid)" class="custom-save-button" title="Eliminar de la lista">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </button>
+                <div style="color:#fff;margin-top:6px;font-weight:700">{{ animeFor(aid).title }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       <div v-if="isLoading" class="loading-state">
         <div class="spinner"></div>
         <p>Cargando tu lista...</p>
       </div>
       
-      <div v-else-if="watchlistAnimes.length === 0" class="empty-state">
+      <div v-else-if="!hasAnySaved" class="empty-state">
         <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
         </svg>
@@ -295,7 +410,7 @@ onMounted(async () => {
         </button>
       </div>
       
-      <div v-else class="watchlist-content">
+      <div v-else-if="watchlistAnimes.length > 0" class="watchlist-content">
         <div class="watchlist-header">
           <h2 class="section-title">{{ watchlistAnimes.length }} {{ watchlistAnimes.length === 1 ? 'anime guardado' : 'animes guardados' }}</h2>
         </div>
@@ -310,6 +425,16 @@ onMounted(async () => {
         </div>
       </div>
     </section>
+    <!-- Confirm Modal -->
+    <div v-if="confirmModal.open" class="confirm-backdrop">
+      <div class="confirm-modal">
+        <p class="confirm-message">{{ confirmModal.message }}</p>
+        <div class="confirm-actions">
+          <button class="btn-cancel" @click="confirmModal.open = false">Cancelar</button>
+          <button class="btn-confirm" @click="confirmModal.onConfirm && confirmModal.onConfirm()">Aceptar</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -494,7 +619,25 @@ onMounted(async () => {
 .watchlist-section {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem;
+}
+.custom-save-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #9333ea 0%, #a855f7 100%);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(147, 51, 234, 0.25);
+}
+.custom-save-button:hover {
+  transform: translateY(-2px);
 }
 
 .loading-state {
@@ -899,5 +1042,52 @@ onMounted(async () => {
     font-size: 0.75rem;
     flex-wrap: wrap;
   }
+}
+
+/* Confirm modal styles */
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.confirm-modal {
+  background: #0b0b0b;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  max-width: 420px;
+  width: 100%;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.confirm-message {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  color: #eee;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.btn-cancel {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #ddd;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-confirm {
+  background: linear-gradient(90deg,#ef4444,#dc2626);
+  border: none;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
 }
 </style>
