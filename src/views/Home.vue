@@ -6,6 +6,7 @@ import { useProfile } from '../composables/useProfile'
 import AnimeCard from '../components/AnimeCard.vue'
 import ContinueWatchingCard from '../components/ContinueWatchingCard.vue'
 import AnimeInfoModal from '../components/AnimeInfoModal.vue'
+import ChatModal from '../components/ChatModal.vue'
 
 const router = useRouter()
 const { currentUser, logout, loadCurrentUser, authenticatedFetch, API_BASE_URL } = useAuth()
@@ -13,6 +14,7 @@ const { currentProfile, loadProfile } = useProfile()
 
 // Mobile menu
 const mobileMenuOpen = ref(false)
+const chatOpen = ref(false)
 
 function toggleMobileMenu() {
   mobileMenuOpen.value = !mobileMenuOpen.value
@@ -385,6 +387,7 @@ onMounted(async () => {
           <!-- ...existing code... -->
           
           <button class="btn-watchlist" @click="router.push('/my-list')">Mi Lista</button>
+          <button class="btn-chat" @click="chatOpen = true">Chat</button>
           
           <div v-if="currentUser" class="user-controls">
             <button @click="router.push('/manager/profiles')" class="btn-profile">
@@ -750,6 +753,8 @@ onMounted(async () => {
       @close="closeModal"
       @watch="onWatchFromModal"
     />
+
+    <ChatModal :show="chatOpen" @close="chatOpen = false" />
 
     <!-- Footer -->
     <footer class="footer">
