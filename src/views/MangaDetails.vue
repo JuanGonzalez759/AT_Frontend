@@ -48,7 +48,16 @@ onMounted(async () => {
 async function loadMangaDetails() {
   try {
     const response = await authenticatedFetch(`/api/backoffice/public/mangas/${mangaId.value}/`)
-    if (response.ok) manga.value = await response.json()
+    const text = await response.text()
+    let data = null
+    try { data = JSON.parse(text) } catch(e) { data = null }
+    console.log('public/mangas response', response.status, data || text)
+    if (response.ok && data) {
+      manga.value = data
+    } else if (data) {
+      // still set for debugging
+      manga.value = data
+    }
   } catch (e) { console.error('Error loading manga:', e) }
   finally { isLoading.value = false }
 }
@@ -94,6 +103,21 @@ const displayedDescription = computed(() => manga.value ? (descriptionExpanded.v
 const showSeeMore = computed(() => manga.value?.description && manga.value.description.length > 280)
 
 const heroBackgroundImage = computed(() => manga.value?.background_image || manga.value?.cover_image)
+
+// Determine if the site actually has uploaded chapters for this manga.
+// We rely on `uploaded_chapters` returned by the API (empty array if none).
+const hasChapters = computed(() => {
+  if (!manga.value) return false
+  if (Array.isArray(manga.value.uploaded_chapters)) return manga.value.uploaded_chapters.length > 0
+  // fallback: treat chapter_count as metadata only; do not assume chapters uploaded
+  return false
+})
+
+const availableChaptersCount = computed(() => {
+  if (!manga.value) return 0
+  if (Array.isArray(manga.value.uploaded_chapters)) return manga.value.uploaded_chapters.length
+  return manga.value.chapter_count || 0
+})
 </script>
 
 <template>
@@ -166,7 +190,7 @@ const heroBackgroundImage = computed(() => manga.value?.background_image || mang
                 <span class="meta-divider">•</span>
                 <span class="meta-item">⭐ {{ manga.rating || 0 }}/10</span>
                 <span class="meta-divider">•</span>
-                <span class="meta-item">{{ manga.chapter_count || 0 }} capítulos</span>
+                <span class="meta-item">{{ availableChaptersCount }} capítulos</span>
               </div>
               <div class="hero-genres"><span v-for="genre in genresList" :key="genre" class="genre-tag">{{ genre }}</span></div>
               <p :class="['hero-description', { 'expanded': descriptionExpanded }]">{{ displayedDescription }}</p>
@@ -179,6 +203,7 @@ const heroBackgroundImage = computed(() => manga.value?.background_image || mang
                   </svg>
                   {{ isSaved ? 'GUARDADO' : 'GUARDAR' }}
                 </button>
+                <button v-if="hasChapters" class="btn-read" @click="() => router.push(`/manga/${mangaId}/read/1`)" style="margin-left:12px;padding:0.9rem 1.2rem;border-radius:8px;background:var(--color-primary);border:none;color:#fff">LEER</button>
               </div>
             </div>
           </div>
@@ -186,6 +211,17 @@ const heroBackgroundImage = computed(() => manga.value?.background_image || mang
       </div>
 
       <!-- description section removed per request -->
+      <!-- Chapters -->
+      <section class="chapters-section" style="padding:2rem">
+        <div v-if="!hasChapters" class="no-chapters">
+          <h3>Todavía no hay capítulos disponibles</h3>
+          <p>Estamos trabajando para subir los capítulos de este manga. Vuelve más tarde.</p>
+        </div>
+          <div v-else>
+          <!-- Aquí iría la lista de capítulos cuando existan -->
+          <p>Capítulos disponibles: {{ availableChaptersCount }}</p>
+        </div>
+      </section>
     </main>
 
     <footer class="footer"><div class="footer-content"><p>&copy; 2026 AniToki. Todos los derechos reservados.</p></div></footer>
@@ -265,6 +301,9 @@ const heroBackgroundImage = computed(() => manga.value?.background_image || mang
 
 .description-section { padding:2.5rem }
 .btn-back { background: transparent; border:1px solid rgba(255,255,255,0.08); padding:8px 12px; border-radius:8px; color:#fff }
+.chapters-section { max-width:1400px; margin: 0 auto; color: var(--color-text-secondary) }
+.no-chapters { background: rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.06); padding:18px; border-radius:8px; color: #fff }
+.no-chapters h3 { margin:0 0 6px 0 }
 /* Footer (match AnimeDetails) */
 .footer { background: #0a0a0a; border-top: 1px solid rgba(255, 255, 255, 0.1); padding: 2rem 0; }
 .footer-content { max-width: 1400px; margin: 0 auto; padding: 0 2.5rem; display: flex; justify-content: space-between; align-items: center; color: rgba(255,255,255,0.5); }

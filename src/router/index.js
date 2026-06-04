@@ -125,6 +125,12 @@ const routes = [
     component: MangaDetails,
     meta: { requiresAuth: true },
   },
+  {
+    path: '/manga/:id/read/:chapter',
+    name: 'MangaReader',
+    component: () => import('../views/MangaReader.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
