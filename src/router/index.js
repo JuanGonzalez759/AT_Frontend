@@ -9,9 +9,11 @@ import Categories from '../views/Categories.vue'
 import MyList from '../views/MyList.vue'
 import Analytics from '../views/Analytics.vue'
 import AnimeDetails from '../views/AnimeDetails.vue'
+import MangaDetails from '../views/MangaDetails.vue'
 import ChooseProfile from '../views/manager/ChooseProfile.vue'
 import AdminDashboard from '../views/backoffice/AdminDashboard.vue'
 import AddAnime from '../views/backoffice/AddAnime.vue'
+import AddManga from '../views/backoffice/AddManga.vue'
 import EditAnime from '../views/backoffice/EditAnime.vue'
 import ManageEpisodes from '../views/backoffice/ManageEpisodes.vue'
 import WatchAnime from '../views/WatchAnime.vue'
@@ -64,6 +66,12 @@ const routes = [
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
+    path: '/backoffice/add-manga',
+    name: 'AddManga',
+    component: AddManga,
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
     path: '/backoffice/edit-anime/:id',
     name: 'EditAnime',
     component: EditAnime,
@@ -109,6 +117,12 @@ const routes = [
     path: '/anime/:id',
     name: 'AnimeDetails',
     component: AnimeDetails,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/manga/:id',
+    name: 'MangaDetails',
+    component: MangaDetails,
     meta: { requiresAuth: true },
   },
 ]

@@ -38,7 +38,16 @@ export function useLists() {
     const id = currentProfile.value?.id
     if (!id) return []
     if (!listsByProfile.value[id]) {
-      listsByProfile.value[id] = loadFromStorage(id)
+      // normalize stored lists: convert legacy numeric ids to objects { id, type }
+      const raw = loadFromStorage(id)
+      listsByProfile.value[id] = (raw || []).map(l => {
+        const items = (l.items || []).map(it => {
+          if (it && typeof it === 'object' && it.id) return it
+          // legacy numeric/string id -> assume anime
+          return { id: it, type: 'anime' }
+        })
+        return { ...l, items }
+      })
     }
     return listsByProfile.value[id]
   }
@@ -58,28 +67,29 @@ export function useLists() {
     return newList
   }
 
-  function addToList(listId, animeId) {
+  function addToList(listId, itemId, type = 'anime') {
     const idProfile = currentProfile.value?.id
     if (!idProfile) return false
     ensureLoaded()
     const lists = listsByProfile.value[idProfile]
     const list = lists.find(l => l.id === listId)
     if (!list) return false
-    if (!list.items.includes(animeId)) {
-      list.items.push(animeId)
+    const exists = list.items.find(i => String(i.id) === String(itemId) && (i.type || 'anime') === (type || 'anime'))
+    if (!exists) {
+      list.items.push({ id: itemId, type: type || 'anime' })
       saveToStorage(idProfile, lists)
     }
     return true
   }
 
-  function removeFromList(listId, animeId) {
+  function removeFromList(listId, itemId, type = 'anime') {
     const idProfile = currentProfile.value?.id
     if (!idProfile) return false
     ensureLoaded()
     const lists = listsByProfile.value[idProfile]
     const list = lists.find(l => l.id === listId)
     if (!list) return false
-    const idx = list.items.indexOf(animeId)
+    const idx = list.items.findIndex(i => String(i.id) === String(itemId) && (i.type || 'anime') === (type || 'anime'))
     if (idx !== -1) {
       list.items.splice(idx, 1)
       saveToStorage(idProfile, lists)
@@ -113,14 +123,14 @@ export function useLists() {
     return true
   }
 
-  function isInList(listId, animeId) {
+  function isInList(listId, itemId, type = 'anime') {
     const idProfile = currentProfile.value?.id
     if (!idProfile) return false
     ensureLoaded()
     const lists = listsByProfile.value[idProfile]
     const list = lists.find(l => l.id === listId)
     if (!list) return false
-    return list.items.includes(animeId)
+    return !!list.items.find(i => String(i.id) === String(itemId) && (i.type || 'anime') === (type || 'anime'))
   }
 
   return {

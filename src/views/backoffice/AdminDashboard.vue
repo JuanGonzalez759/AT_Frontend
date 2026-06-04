@@ -45,6 +45,10 @@ function goToAddAnime() {
   router.push('/backoffice/add-anime')
 }
 
+function goToAddManga() {
+  router.push('/backoffice/add-manga')
+}
+
 function goToManageEpisodes(animeId) {
   router.push(`/backoffice/episodes/${animeId}`)
 }
@@ -157,6 +161,12 @@ async function confirmDelete() {
             <path d="M12 5v14M5 12h14"></path>
           </svg>
           Añadir Anime
+        </button>
+        <button class="btn-add-anime btn-add-manga" @click="goToAddManga">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"></path>
+          </svg>
+          Añadir Manga
         </button>
       </div>
 

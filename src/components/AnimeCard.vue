@@ -46,7 +46,11 @@ const showSaveModal = ref(false)
 
 function handleClick() {
   if (props.animeId) {
-    router.push(`/anime/${props.animeId}`)
+    if (props.contentType === 'MANGA' || props.contentType === 'Manga') {
+      router.push(`/manga/${props.animeId}`)
+    } else {
+      router.push(`/anime/${props.animeId}`)
+    }
   }
 }
 
@@ -75,7 +79,8 @@ async function toggleSave(event) {
   }
 
   if (isSaved.value) {
-    const success = await removeFromWatchlist(props.animeId)
+    const type = props.contentType === 'MANGA' || props.contentType === 'Manga' ? 'manga' : 'anime'
+    const success = await removeFromWatchlist(props.animeId, type)
     if (success) {
       isSaved.value = false
       emit('watchlist-updated')
@@ -218,6 +223,7 @@ onMounted(() => {
       :animeId="props.animeId"
       :title="props.title"
       :image="props.image"
+      :contentType="props.contentType"
       @close="onModalClose"
       @added="onModalAdded"
     />

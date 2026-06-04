@@ -80,6 +80,7 @@ const simulcasts = ref([])
 const actionAnimes = ref([])
 const romanceAnimes = ref([])
 const comedyAnimes = ref([])
+const popularMangas = ref([])
 
 // Progreso del usuario
 const userProgress = ref([])
@@ -243,6 +244,38 @@ async function loadAnimes() {
         .sort((a, b) => (b.rating || 0) - (a.rating || 0))
         .map(transformAnime)
       
+      // Cargar mangas públicos y transformarlos para mostrar como cards
+      try {
+        const respM = await authenticatedFetch(`/api/backoffice/public/mangas/?page_size=100`)
+        if (respM.ok) {
+          const md = await respM.json()
+          const mangas = md.results || md
+          const transformManga = (m) => ({
+            animeId: m.id,
+            title: m.title,
+            subtitle: `${m.year || ''} • ${m.genre || ''}`.trim(),
+            genre: m.genre,
+            image: m.cover_image,
+            episodeCount: m.chapter_count || 0,
+            audioType: 'MANGA',
+            ageRating: null,
+            isSimulcast: false,
+            rating: m.rating,
+            progress: 0,
+            isDemoContent: true,
+            contentType: 'MANGA'
+          })
+
+          popularMangas.value = [...mangas]
+            .sort((a,b) => (b.rating || 0) - (a.rating || 0))
+            .slice(0, 15)
+            .map(transformManga)
+        }
+      } catch (err) {
+        console.debug('Could not load mangas for home:', err)
+        popularMangas.value = []
+      }
+      
       // Continue Watching - REAL data from user progress (episodios en progreso)
       continueWatching.value = userProgress.value
         .filter(p => p.current_episode > 0 && !p.watched) // Solo en progreso
@@ -309,7 +342,11 @@ function closeModal() {
 
 function onWatchFromModal(anime) {
   const id = anime.id || anime.animeId || anime.anime_id
-  if (id) router.push(`/anime/${id}`)
+  if (id) {
+    const ct = anime.contentType || anime.content_type
+    if (ct === 'MANGA' || ct === 'Manga') router.push(`/manga/${id}`)
+    else router.push(`/anime/${id}`)
+  }
   closeModal()
 }
 
@@ -585,6 +622,32 @@ onMounted(async () => {
           <button 
             class="carousel-arrow next" 
             @click="scrollCarousel('.carousel-continue', 'next')"
+          >›</button>
+        </div>
+      </section>
+
+      <!-- Mangas -->
+      <section v-if="popularMangas.length > 0" class="content-section">
+        <div class="section-header">
+          <h2 class="section-title">Manga</h2>
+          <p class="section-subtitle">Mangas populares</p>
+        </div>
+        <div class="carousel-container">
+          <button 
+            class="carousel-arrow prev" 
+            @click="scrollCarousel('.carousel-manga', 'prev')"
+          >‹</button>
+          <div class="carousel-track carousel-manga">
+            <AnimeCard
+              v-for="item in popularMangas"
+              :key="item.animeId"
+              v-bind="item"
+              @show-info="openModal"
+            />
+          </div>
+          <button 
+            class="carousel-arrow next" 
+            @click="scrollCarousel('.carousel-manga', 'next')"
           >›</button>
         </div>
       </section>

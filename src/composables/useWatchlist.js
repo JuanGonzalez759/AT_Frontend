@@ -86,24 +86,25 @@ export function useWatchlist() {
 
   function isInWatchlist(animeId) {
     if (!watchlistCache.value) return false
-    return watchlistCache.value.some(item => item.anime.id === animeId)
+    return watchlistCache.value.some(item => item.anime && item.anime.id === animeId)
   }
 
   function clearCache() {
     clearProfileCache()
   }
 
-  async function addToWatchlist(animeId) {
+  async function addToWatchlist(animeId, type = 'anime') {
     try {
       const profileId = currentProfile.value?.id
       if (!profileId) return false
 
+      const body = { profile_id: profileId }
+      if (type === 'manga') body.manga_id = animeId
+      else body.anime_id = animeId
+
       const response = await authenticatedFetch('/api/manager/watchlist/', {
         method: 'POST',
-        body: JSON.stringify({ 
-          anime_id: animeId,
-          profile_id: profileId
-        })
+        body: JSON.stringify(body)
       })
 
       if (response.ok) {
@@ -117,12 +118,15 @@ export function useWatchlist() {
     }
   }
 
-  async function removeFromWatchlist(animeId) {
+  async function removeFromWatchlist(animeId, type = 'anime') {
     try {
       const profileId = currentProfile.value?.id
       if (!profileId) return false
 
-      const response = await authenticatedFetch(`/api/manager/watchlist/remove/${animeId}/?profile_id=${profileId}`, {
+      const params = new URLSearchParams({ profile_id: profileId })
+      if (type === 'manga') params.set('type', 'manga')
+
+      const response = await authenticatedFetch(`/api/manager/watchlist/remove/${animeId}/?${params.toString()}`, {
         method: 'DELETE'
       })
 

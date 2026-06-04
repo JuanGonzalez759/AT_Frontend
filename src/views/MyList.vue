@@ -21,18 +21,28 @@ const customLists = ref([])
 const newListName = ref('')
 
 const animeCache = ref({})
+const mangaCache = ref({})
 
 // Modal state for confirming destructive actions
 const confirmModal = ref({ open: false, message: '', onConfirm: null })
 
 function loadLists() {
   customLists.value = getLists() || []
-  // fetch anime details for cached ids
-  const ids = new Set()
-  customLists.value.forEach(l => l.items.forEach(id => ids.add(id)))
-  ids.forEach(id => {
-    if (!animeCache.value[id]) fetchAnime(id)
-  })
+  // ensure items are objects { id, type }
+  customLists.value = customLists.value.map(l => ({
+    ...l,
+    items: (l.items || []).map(it => (it && typeof it === 'object' && it.id) ? it : { id: it, type: 'anime' })
+  }))
+
+  // fetch details for both anime and manga ids
+  const animeIds = new Set()
+  const mangaIds = new Set()
+  customLists.value.forEach(l => l.items.forEach(it => {
+    if ((it.type || 'anime') === 'manga') mangaIds.add(it.id)
+    else animeIds.add(it.id)
+  }))
+  animeIds.forEach(id => { if (!animeCache.value[id]) fetchAnime(id) })
+  mangaIds.forEach(id => { if (!mangaCache.value[id]) fetchManga(id) })
 }
 
 const totalCustomItems = computed(() => {
@@ -54,6 +64,18 @@ async function fetchAnime(id) {
     console.error('Error fetching anime detail', e)
   }
 }
+
+  async function fetchManga(id) {
+    try {
+      const response = await authenticatedFetch(`/api/backoffice/public/mangas/${id}/`)
+      if (response.ok) {
+        const data = await response.json()
+        mangaCache.value[id] = data
+      }
+    } catch (e) {
+      console.error('Error fetching manga detail', e)
+    }
+  }
 
 function handleCreateList() {
   const name = newListName.value && newListName.value.trim()
@@ -81,12 +103,18 @@ function handleDeleteList(listId) {
   }
 }
 
-function animeFor(id) {
+function itemFor(itemOrId) {
+  const item = (itemOrId && typeof itemOrId === 'object' && itemOrId.id) ? itemOrId : { id: itemOrId, type: 'anime' }
+  const id = item.id
+  const type = (item.type || 'anime')
+  if (type === 'manga') {
+    return mangaCache.value[id] || { id, title: 'Cargando...', cover_image: '/profiles/Profile1.png' }
+  }
   return animeCache.value[id] || { id, title: 'Cargando...', cover_image: '/profiles/Profile1.png' }
 }
 
-function removeFromCustomList(listId, animeId) {
-  const ok = removeFromList(listId, animeId)
+function removeFromCustomList(listId, itemId, type = 'anime') {
+  const ok = removeFromList(listId, itemId, type)
   if (ok) {
     loadLists()
   }
@@ -381,14 +409,14 @@ onMounted(async () => {
             </div>
 
             <div style="display:flex;gap:12px;flex-wrap:wrap">
-              <div v-for="aid in lst.items" :key="aid" style="position:relative;width:140px">
-                <img :src="animeFor(aid).cover_image" :alt="animeFor(aid).title" style="width:140px;height:210px;object-fit:cover;border-radius:8px;cursor:pointer" @click="router.push(`/anime/${aid}`)" />
-                <button @click="removeFromCustomList(lst.id, aid)" class="custom-save-button" title="Eliminar de la lista">
+              <div v-for="it in lst.items" :key="it.id + '-' + it.type" style="position:relative;width:140px">
+                <img :src="itemFor(it).cover_image" :alt="itemFor(it).title" style="width:140px;height:210px;object-fit:cover;border-radius:8px;cursor:pointer" @click="() => { if ((it.type||'anime') === 'manga') router.push(`/manga/${it.id}`); else router.push(`/anime/${it.id}`) }" />
+                <button @click="() => removeFromCustomList(lst.id, it.id, it.type)" class="custom-save-button" title="Eliminar de la lista">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
                   </svg>
                 </button>
-                <div style="color:#fff;margin-top:6px;font-weight:700">{{ animeFor(aid).title }}</div>
+                <div style="color:#fff;margin-top:6px;font-weight:700">{{ itemFor(it).title }}</div>
               </div>
             </div>
           </div>

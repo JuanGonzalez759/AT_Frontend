@@ -9,7 +9,11 @@ const props = defineProps({
   title: String,
   image: String,
   show: Boolean
+  ,contentType: String
 })
+
+// contentType can be 'MANGA' when saving a manga
+const contentType = props.contentType || 'anime'
 const emit = defineEmits(['close','added'])
 
 const { getLists, createList, addToList } = useLists()
@@ -25,10 +29,12 @@ async function handleSelectList(list) {
   if (!currentProfile.value) return
   // special reserved id for "Mi Lista"
   if (list === 'mi-lista') {
-    const ok = await addToWatchlist(props.animeId)
+    const type = (props.contentType === 'MANGA' || props.contentType === 'Manga') ? 'manga' : 'anime'
+    const ok = await addToWatchlist(props.animeId, type)
     if (ok) emit('added', { to: 'mi-lista' })
   } else {
-    const ok = addToList(list.id, props.animeId)
+    const type = (props.contentType === 'MANGA' || props.contentType === 'Manga') ? 'manga' : 'anime'
+    const ok = addToList(list.id, props.animeId, type)
     if (ok) emit('added', { to: list.id })
   }
   emit('close')
@@ -43,7 +49,8 @@ function handleCreateList() {
   creating.value = false
   // auto-select the new list
   if (created) {
-    addToList(created.id, props.animeId)
+    const type = (props.contentType === 'MANGA' || props.contentType === 'Manga') ? 'manga' : 'anime'
+    addToList(created.id, props.animeId, type)
     emit('added', { to: created.id })
     emit('close')
   }
